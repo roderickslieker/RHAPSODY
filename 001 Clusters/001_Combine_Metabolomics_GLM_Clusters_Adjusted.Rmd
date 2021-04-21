@@ -1,0 +1,275 @@
+---
+title: "003_Combine_Metabolomics_GLM_Clusters Adjusted"
+author: "Gerard Bouland / Roderick Slieker"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+#knitr::opts_knit$set(root.dir = "/Users/roderick/Documents/Projecten en papers/Rhapsody_FDB/000.Final_Scripts/")
+knitr::opts_knit$set(root.dir = "Z:/Roderick/001 Projects/Rhapsody/001.1 Federated analyses/000.Final_Scripts/")
+```
+
+
+```{r, echo=FALSE, message=FALSE}
+library(meta)
+library(reshape2)
+library(ggplot2)
+library(knitr)
+library(datashieldclient)
+library(dsCDISCclient)
+library(survminer)
+library(survival)
+library(reshape2)
+library(viridis)
+library(ggplot2)
+library(NMF)
+library(OmicCircos)
+
+source("./003.Utils/forestplot.R")
+source("./003.Utils/OmicCircos.R")
+
+load("./000.Characteristics/Metabolomics_Adjusted.RData")
+load("./000.Characteristics/godarts_Metabolomics_Adjusted.RData")
+load("./000.Characteristics/andis_Metabolomics_Adjusted.RData")
+```
+
+```{r PlotFunction, echo=FALSE}
+get.plot <- function(dataDCS, datagodarts, title, cohortLabels, ymin, ymax, xmin, xmax)
+{
+  pd <- data.frame(Beta.DCS = dataDCS$Estimate, Beta.godarts = datagodarts$Estimate)
+  pd$Sign <- ifelse(dataDCS$p_adjusted <= 0.05 & datagodarts$p_adjusted <= 0.05, "Sign", "NonSign")
+  
+  pd$label <- ifelse(pd$Sign == "Sign", NA, NA)
+  
+  minx <- round(min(c(pd$Beta.DCS, pd$Beta.godarts)), 1)
+  maxx <- round(max(c(pd$Beta.DCS, pd$Beta.godarts)), 1)
+  
+  P <- ggplot(pd, aes(x=Beta.DCS, y=Beta.godarts, label=label))+
+    geom_point()+
+    geom_text()+
+    #scale_colour_manual(values = viridis::viridis_pal()(length(unique(cols))))+
+    xlab(paste("Estimate",cohortLabels[1]))+
+    ylab(paste("Estimate",cohortLabels[2]))+
+    ggtitle(title)+
+    geom_smooth(method=lm, col='black')+
+    geom_vline(xintercept = 0)+
+    geom_hline(yintercept = 0)+
+    xlim(xmin, xmax)+ylim(ymin, ymax)
+
+  return(P)
+}
+```
+
+```{r GLMCombine, echo=FALSE}
+CombineGLM <- function(Data01, Data02, Data03, ColVar, studyLabels){
+  #Check if dataframes have equal number of rows
+  if(!nrow(Data01) == nrow(Data02)){
+    stop("Dataframes are not of equal length")
+  }
+  #Check if variables are equal and in same order
+  if(!table(as.character(Data01[,ColVar]) == as.character(Data02[,ColVar]))==nrow(Data01)){
+    stop("Variables of dataframes are not in same order")
+  }
+  if(!table(as.character(Data01[,ColVar]) == as.character(Data03[,ColVar]))==nrow(Data01)){
+    stop("Variables of dataframes are not in same order")
+  }
+  
+  combined <- data.frame()
+  variables <-as.character(Data01[,ColVar])
+  
+  for(i in seq_along(variables)){
+    var <- variables[i]
+    tmp.merge <- rbind(Data01[Data01[,ColVar] == var,],
+                       Data02[Data02[,ColVar] == var,],
+                       Data03[Data03[,ColVar] == var,])
+    
+
+    tmp.combined <- metagen(TE = tmp.merge$Estimate, seTE = tmp.merge$Std..Error, studlab = studyLabels, comb.fixed = TRUE, comb.random = TRUE)
+    cis <- ci(TE = tmp.combined$TE.random, seTE = tmp.combined$seTE.random, level=0.95, df=NULL, null.effect = 0)
+    summ <- data.frame(var,
+                      Effect.random = tmp.combined$TE.random,
+                      lower = cis$lower,
+                      upper = cis$upper,
+                      Zval.random = tmp.combined$zval.random,
+                      Pval.random  = tmp.combined$pval.random,
+                      I2 = summary(tmp.combined)$I2$TE,
+                      Het = pchisq(tmp.combined$Q,1, lower.tail=F))
+    
+    combined <- rbind(combined,summ)
+  }
+  combined <- combined[order(combined$Pval.random, decreasing=F),]
+  combined$fdr.random <- p.adjust(combined$Pval.random,method="fdr")
+  return(combined)
+}
+```
+
+```{r, echo=FALSE}
+updateData <- function(data,varNames){
+  data <- data[match(varNames, data$var),]
+  data$p_adjusted <- p.adjust(data$p.value,'fdr')
+  return(data)
+}
+updateData2 <- function(data,varNames){
+  data <- data[match(varNames, data$var),]
+  #data$p_adjusted <- p_adjustedust(data$p.value,'fdr')
+  return(data)
+}
+```
+
+```{r histo, echo=FALSE}
+cols <- c("#132B41","#009AC6","#E1B70A","#B81E3D","#878786")
+
+getPlot <- function(cohorts, var, title=NULL, breaks=NULL){
+  dataframes <- lapply(cohorts,function(co){get(co)[get(co)$lip == var,]})
+  pd <- do.call(rbind,dataframes)
+  pdx <- pd[pd$variable %in% c("25%","75%","50%"),]
+  pdx.t <- pdx[pdx$variable %in% "25%",]
+  pdx.t <- pdx.t[,-(c(ncol(pdx.t)-1):ncol(pdx.t))]
+  pdx.t$v25 <- pdx[pdx$variable %in% "25%","value"]
+  pdx.t$v50 <- pdx[pdx$variable %in% "50%","value"]
+  pdx.t$v75 <- pdx[pdx$variable %in% "75%","value"]
+  
+  conv <- data.frame(id = 2:6,
+                     name = c("1/SIDD","2/SIRD","3/MOD","4/MD","5/MDH"))
+  pdx.t$Cluster <- conv[match(pdx.t$cluster, conv$id),"name"]
+  
+  pdx.t$cohort2 <- toupper(substr(pdx.t$cohort, 1, 1))
+  pdx.t$cohort <- factor(pdx.t$cohort, levels=c("dcs","godarts","andis"))
+  p1 <- ggplot(pdx.t, aes(x=factor(Cluster), y=v50))+
+    geom_point(size=2, position=position_dodge2(width=  0.4), aes(col=Cluster, group=cohort))+
+    geom_errorbar(aes(x=Cluster, ymin=v25, ymax=v75, col=Cluster, group=cohort), width=0, position=position_dodge(width = 0.4))+
+    scale_y_continuous(trans="log10")+#, limits = c(min(pdx.t$v25)/1.5,max(pdx.t$v75)*1.5))+
+    scale_colour_manual(values = cols)+
+    #geom_text(aes(x=Cluster, y=v75*1.04, label=cohort2), position=position_dodge2(width=0.4))+
+    ylab("Levels")+
+    xlab("Cluster")+
+    facet_wrap(~cohort, scale="free_y")+
+    theme(legend.position = "none")
+  
+  if(!is.null(title))
+  {
+    p1 <- p1+ggtitle(title)
+  }
+  if(!is.null(breaks))
+  {
+    p1 <- p1+scale_y_continuous(trans="log10",breaks=breaks)
+  }
+  
+  pdf(sprintf("../003.Figures.combined/Plot_of_%s.pdf", var), width=8, height=3)
+  print(p1)
+  dev.off()
+  return(p1)
+}
+```
+
+```{r,echo=FALSE}
+tmp <- c(as.character(andis.metabolomics.results.SIDD$var),
+         as.character(DCS.metabolomics.results.SIDD$var),
+         as.character(godarts.metabolomics.results.SIDD$var))
+metabolites <- names(table(tmp)[table(tmp) == 3])
+
+#Update DCS
+results.SIDD.DCS  <- updateData(DCS.metabolomics.results.SIDD,metabolites)
+results.SIRD.DCS  <- updateData(DCS.metabolomics.results.SIRD,metabolites)
+results.MOD.DCS   <- updateData(DCS.metabolomics.results.MOD,metabolites)
+#results.MARD.DCS  <- updateData(DCS.metabolomics.results.MARD,metabolites)
+results.MARDH.DCS <- updateData(DCS.metabolomics.results.MARDH,metabolites)
+
+#Update godarts
+results.SIDD.godarts  <- updateData(godarts.metabolomics.results.SIDD,metabolites)
+results.SIRD.godarts  <- updateData(godarts.metabolomics.results.SIRD,metabolites)
+results.MOD.godarts   <- updateData(godarts.metabolomics.results.MOD,metabolites)
+#results.MARD.godarts  <- updateData(godarts.metabolomics.results.MARD,metabolites)
+results.MARDH.godarts <- updateData(godarts.metabolomics.results.MARDH,metabolites)
+
+#Update andis
+results.SIDD.andis  <- updateData(andis.metabolomics.results.SIDD,metabolites)
+results.SIRD.andis  <- updateData(andis.metabolomics.results.SIRD,metabolites)
+results.MOD.andis   <- updateData(andis.metabolomics.results.MOD,metabolites)
+#results.MARD.andis  <- updateData(andis.metabolomics.results.MARD,metabolites)
+results.MARDH.andis <- updateData(andis.metabolomics.results.MARDH,metabolites)
+```
+
+```{r, echo=FALSE}
+meta.SIDD.metabolomics_adjusted <- CombineGLM(results.SIDD.DCS,results.SIDD.godarts,results.SIDD.andis,ColVar = "var",studyLabels = c("dcs","godarts","andis"))
+meta.SIRD.metabolomics_adjusted  <- CombineGLM(results.SIRD.DCS,results.SIRD.godarts,results.SIRD.andis,ColVar = "var",studyLabels = c("dcs","godarts","andis"))
+meta.MOD.metabolomics_adjusted  <- CombineGLM(results.MOD.DCS,results.MOD.godarts,results.MOD.andis,ColVar = "var",studyLabels = c("dcs","godarts","andis"))
+#meta.MARD.metabolomics  <- CombineGLM(results.MARD.DCS,results.MARD.godarts,results.MARD.andis,ColVar = "var",studyLabels = c("dcs","godarts","andis"))
+meta.MARDH.metabolomics_adjusted  <- CombineGLM(results.MARDH.DCS,results.MARDH.godarts,results.MARDH.andis,ColVar = "var",studyLabels = c("dcs","godarts","andis"))
+```
+
+
+# Comparison
+
+```{r}
+load("./002.Clusters.Combine/Metabolomics_Clusters_Meta_SIDD.RData")
+load("./002.Clusters.Combine/Metabolomics_Clusters_Meta_SIRD.RData")
+load("./002.Clusters.Combine/Metabolomics_Clusters_Meta_MOD.RData")
+load("./002.Clusters.Combine/Metabolomics_Clusters_Meta_MARDH.RData")
+
+meta.SIDD.metabolomics  <- updateData2(meta.SIDD.metabolomics,metabolites)
+meta.SIDD.metabolomics_adjusted  <- updateData2(meta.SIDD.metabolomics_adjusted,metabolites)
+
+meta.SIRD.metabolomics  <- updateData2(meta.SIRD.metabolomics,metabolites)
+meta.SIRD.metabolomics_adjusted  <- updateData2(meta.SIRD.metabolomics_adjusted,metabolites)
+
+meta.MOD.metabolomics  <- updateData2(meta.MOD.metabolomics,metabolites)
+meta.MOD.metabolomics_adjusted  <- updateData2(meta.MOD.metabolomics_adjusted,metabolites)
+
+meta.MARDH.metabolomics <- updateData2(meta.MARDH.metabolomics, metabolites)
+meta.MARDH.metabolomics_adjusted <- updateData2(meta.MARDH.metabolomics_adjusted, metabolites)
+
+meta.SIDD.metabolomics_adjusted$Group <-"SIDD"
+meta.SIRD.metabolomics_adjusted$Group <-"SIRD"
+meta.MOD.metabolomics_adjusted$Group <-"MOD"
+meta.MARDH.metabolomics_adjusted$Group <-"MDH"
+
+meta.SIDD.metabolomics[order(meta.SIDD.metabolomics$fdr.random),]#[1:5,]
+meta.SIRD.metabolomics[order(meta.SIRD.metabolomics$fdr.random),]#[1:5,]
+meta.MOD.metabolomics[order(meta.MOD.metabolomics$fdr.random),]#[1:5,]
+meta.MARDH.metabolomics[order(meta.MARDH.metabolomics$fdr.random),]#[1:5,]
+```
+
+
+```{r}
+pd <- data.frame(
+  var = c(as.character(meta.SIDD.metabolomics_adjusted$var), as.character(meta.SIRD.metabolomics_adjusted$var), as.character(meta.MOD.metabolomics_adjusted$var), as.character(meta.MARDH.metabolomics_adjusted$var)),
+  cluster = c(meta.SIDD.metabolomics_adjusted$Group, meta.SIRD.metabolomics_adjusted$Group, meta.MOD.metabolomics_adjusted$Group, meta.MARDH.metabolomics_adjusted$Group),
+  unadj = c(meta.SIDD.metabolomics$Effect.random, meta.SIRD.metabolomics$Effect.random, meta.MOD.metabolomics$Effect.random, meta.MARDH.metabolomics$Effect.random),
+  adj = c(meta.SIDD.metabolomics_adjusted$Effect.random, meta.SIRD.metabolomics_adjusted$Effect.random, meta.MOD.metabolomics_adjusted$Effect.random, meta.MARDH.metabolomics_adjusted$Effect.random)
+)
+
+pd <- na.omit(pd)
+
+```
+
+```{r}
+pd$label <- NA
+pd[abs(pd$unadj) >= 0.4 & sign(pd$unadj) != sign(pd$adj),"label"] <- as.character(pd[abs(pd$unadj) >= 0.4 & sign(pd$unadj) != sign(pd$adj),"var"])
+
+plotly::ggplotly(ggplot(pd, aes(x=unadj*-1, y=adj*-1, col=cluster, group=var, label=var))+
+  geom_point()+
+  facet_grid(~cluster)+
+  geom_smooth(method="lm", se=F)+
+  geom_vline(xintercept = 0)+
+  geom_hline(yintercept = 0)+
+  scale_color_manual(values = c("#4DB3E6","#00B399","#E69900","#CC80B3","#132B41"))
+)
+
+
+pd$cluster <- factor(pd$cluster, levels=c("SIDD","SIRD","MOD","MDH"))
+
+pdf("../../001 Scripts/013 Crossvalidation/Effect size comparison metabolomics.pdf", width=10, height=3)
+ggplot(pd, aes(x=unadj, y=adj, col=cluster, label=label))+
+  geom_point(size=2)+
+  facet_grid(~cluster)+
+  geom_smooth(method = "lm", se=F)+
+  geom_vline(xintercept = 0)+
+  geom_hline(yintercept = 0)+
+  scale_color_manual(values = c("#4DB3E6","#00B399","#E69900","#CC80B3","#132B41"))+
+  ggrepel::geom_label_repel()+
+  theme(legend.position = "none")
+dev.off()
+``` 
+
