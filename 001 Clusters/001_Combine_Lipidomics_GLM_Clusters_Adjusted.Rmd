@@ -1,0 +1,180 @@
+---
+title: "001_Combine_Lipidomics_GLM_Clusters Adjusted"
+author: "Gerard Bouland / Roderick Slieker"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: md_document
+---
+
+```{r setup, include=FALSE}
+#setwd("D:/001_Projects/001_RHAPSODY/")
+knitr::opts_knit$set(root.dir = "D:/001_Projects/001_RHAPSODY/")
+```
+
+
+```{r, echo=FALSE, message=FALSE}
+library(meta)
+library(reshape2)
+library(ggplot2)
+library(knitr)
+library(survival)
+library(reshape2)
+library(viridis)
+library(ggplot2)
+library(NMF)
+
+source("./000.Final_Scripts/003.Utils/forestplot.R")
+source("./000.Final_Scripts/003.Utils/OmicCircos.R")
+source("D:/001_Projects/033 Final scripts RHAPSODY/999 Utils/Utils.R")
+
+load("./000.Final_Scripts/002.Clusters.Data/lipids GLM_models across clusters_FDB_DCS_OneVsAll_adjusted.RData")
+load("./000.Final_Scripts/002.Clusters.Data/lipids GLM_models across clusters_FDB_GoDARTS_OneVsAll_adjusted.RData")
+load("./000.Final_Scripts/002.Clusters.Data/lipids GLM_models across clusters_FDB_ANDIS_OneVsAll_adjusted.RData")
+```
+
+```{r,echo=FALSE}
+tmp <- c(as.character(ANDIS.lipidomics.SIDD.adj$var),
+         as.character(DCS.lipidomics.SIDD.adj$var),
+         as.character(GoDARTS.lipidomics.SIDD.adj$var))
+lipids <- names(table(tmp)[table(tmp) == 3])
+
+#Update DCS
+results.SIDD.DCS  <- updateData(DCS.lipidomics.SIDD.adj,lipids)
+results.SIRD.DCS  <- updateData(DCS.lipidomics.SIRD.adj,lipids)
+results.MOD.DCS   <- updateData(DCS.lipidomics.MOD.adj,lipids)
+results.MDH.DCS <- updateData(DCS.lipidomics.MDH.adj,lipids)
+results.MDH.DCS_Trig <- updateData(DCS.lipidomics.MDH.adj_TRIG,lipids)
+
+#Update godarts
+results.SIDD.godarts  <- updateData(GoDARTS.lipidomics.SIDD.adj,lipids)
+results.SIRD.godarts  <- updateData(GoDARTS.lipidomics.SIRD.adj,lipids)
+results.MOD.godarts   <- updateData(GoDARTS.lipidomics.MOD.adj,lipids)
+results.MDH.godarts <- updateData(GoDARTS.lipidomics.MDH.adj,lipids)
+results.MDH.godarts_Trig <- updateData(GoDARTS.lipidomics.MDH.adj_TRIG,lipids)
+
+#Update andis
+results.SIDD.andis  <- updateData(ANDIS.lipidomics.SIDD.adj,lipids)
+results.SIRD.andis  <- updateData(ANDIS.lipidomics.SIRD.adj,lipids)
+results.MOD.andis   <- updateData(ANDIS.lipidomics.MOD.adj,lipids)
+results.MDH.andis <- updateData(ANDIS.lipidomics.MDH.adj,lipids)
+results.MDH.andis_Trig <- updateData(ANDIS.lipidomics.MDH.adj_TRIG,lipids)
+```
+
+```{r, echo=FALSE}
+meta.SIDD.Lipidomics_adjusted <- CombineGLM(results.SIDD.DCS,results.SIDD.godarts,results.SIDD.andis,ColVar = "var",studyLabels = c("dcs","godarts","andis"))
+meta.SIRD.Lipidomics_adjusted  <- CombineGLM(results.SIRD.DCS,results.SIRD.godarts,results.SIRD.andis,ColVar = "var",studyLabels = c("dcs","godarts","andis"))
+meta.MOD.Lipidomics_adjusted  <- CombineGLM(results.MOD.DCS,results.MOD.godarts,results.MOD.andis,ColVar = "var",studyLabels = c("dcs","godarts","andis"))
+#meta.MARD.Lipidomics  <- CombineGLM(results.MARD.DCS,results.MARD.godarts,results.MARD.andis,ColVar = "var",studyLabels = c("dcs","godarts","andis"))
+meta.MDH.Lipidomics_adjusted  <- CombineGLM(results.MDH.DCS,results.MDH.godarts,results.MDH.andis,ColVar = "var",studyLabels = c("dcs","godarts","andis"))
+meta.MDH.Lipidomics_adjusted_trig  <- CombineGLM(results.MDH.DCS_Trig,results.MDH.godarts_Trig,results.MDH.andis_Trig,ColVar = "var",studyLabels = c("dcs","godarts","andis"))
+```
+
+
+# Comparison
+
+```{r}
+load("./000.Final_Scripts/002.Clusters.Combine/Lipidomics_Clusters_Meta_SIDD.RData")
+load("./000.Final_Scripts/002.Clusters.Combine/Lipidomics_Clusters_Meta_SIRD.RData")
+load("./000.Final_Scripts/002.Clusters.Combine/Lipidomics_Clusters_Meta_MOD.RData")
+load("./000.Final_Scripts/002.Clusters.Combine/Lipidomics_Clusters_Meta_MARDH.RData")
+
+meta.SIDD.Lipidomics  <- updateData2(meta.SIDD.lipidomics,lipids)
+meta.SIDD.Lipidomics_adjusted  <- updateData2(meta.SIDD.Lipidomics_adjusted,lipids)
+
+meta.SIRD.Lipidomics  <- updateData2(meta.SIRD.lipidomics,lipids)
+meta.SIRD.Lipidomics_adjusted  <- updateData2(meta.SIRD.Lipidomics_adjusted,lipids)
+
+meta.MOD.Lipidomics  <- updateData2(meta.MOD.lipidomics,lipids)
+meta.MOD.Lipidomics_adjusted  <- updateData2(meta.MOD.Lipidomics_adjusted,lipids)
+
+meta.MDH.Lipidomics <- updateData2(meta.MARDH.lipidomics, lipids)
+meta.MDH.Lipidomics_adjusted <- updateData2(meta.MDH.Lipidomics_adjusted, lipids)
+meta.MDH.Lipidomics_adjusted_trig <- updateData2(meta.MDH.Lipidomics_adjusted_trig, lipids)
+
+meta.SIDD.Lipidomics_adjusted$Group <-"SIDD"
+meta.SIRD.Lipidomics_adjusted$Group <-"SIRD"
+meta.MOD.Lipidomics_adjusted$Group <-"MOD"
+meta.MDH.Lipidomics_adjusted$Group <-"MDH"
+meta.MDH.Lipidomics_adjusted_trig$Group <- "MDH (trig)"
+
+meta.SIDD.Lipidomics_adjusted[order(meta.SIDD.Lipidomics_adjusted$fdr.random),][1:5,]
+meta.SIRD.Lipidomics_adjusted[order(meta.SIRD.Lipidomics_adjusted$fdr.random),][1:5,]
+meta.MOD.Lipidomics_adjusted[order(meta.MOD.Lipidomics_adjusted$fdr.random),][1:5,]
+meta.MDH.Lipidomics_adjusted[order(meta.MDH.Lipidomics_adjusted$fdr.random),][1:5,]
+```
+
+
+```{r}
+table(meta.SIDD.Lipidomics_adjusted$var == meta.SIDD.Lipidomics$var)
+
+pd <- data.frame(
+  var = c(
+    as.character(meta.SIDD.Lipidomics_adjusted$var), 
+    as.character(meta.SIRD.Lipidomics_adjusted$var), 
+    as.character(meta.MOD.Lipidomics_adjusted$var), 
+    as.character(meta.MDH.Lipidomics_adjusted$var),
+    as.character(meta.MDH.Lipidomics_adjusted_trig$var)
+    ),
+  
+  cluster = c(meta.SIDD.Lipidomics_adjusted$Group, 
+              meta.SIRD.Lipidomics_adjusted$Group, 
+              meta.MOD.Lipidomics_adjusted$Group, 
+              meta.MDH.Lipidomics_adjusted$Group,
+              meta.MDH.Lipidomics_adjusted_trig$Group
+              ),
+  
+  unadj = c(
+    meta.SIDD.Lipidomics$Effect.random, 
+    meta.SIRD.Lipidomics$Effect.random, 
+    meta.MOD.Lipidomics$Effect.random, 
+    meta.MDH.Lipidomics$Effect.random,
+    meta.MDH.Lipidomics$Effect.random    
+    ),
+  
+  adj = c(
+    meta.SIDD.Lipidomics_adjusted$Effect.random,
+    meta.SIRD.Lipidomics_adjusted$Effect.random,
+    meta.MOD.Lipidomics_adjusted$Effect.random,
+    meta.MDH.Lipidomics_adjusted$Effect.random,
+    meta.MDH.Lipidomics_adjusted_trig$Effect.random
+    )
+)
+
+pd <- na.omit(pd)
+
+```
+
+```{r}
+pd$label <- NA
+pd[abs(pd$unadj) >= 0.4 & sign(pd$unadj) != sign(pd$adj),"label"] <- as.character(pd[abs(pd$unadj) >= 0.4 & sign(pd$unadj) != sign(pd$adj),"var"])
+
+groups <- rio::import("./002.Data/SwissLipids.csv")
+
+pd$Group <- groups[match(pd$var, groups$FDBName),"Class"]
+
+pd$cluster <- factor(pd$cluster, levels=c("SIDD","SIRD","MOD","MDH","MDH (trig)"))
+
+head(pd)
+
+ggplot(pd, aes(x=unadj*-1, y=adj*-1, col=Group, group=var, label=var))+
+  geom_point()+
+  facet_grid(~cluster)+
+  geom_smooth(method="lm", se=F)+
+  geom_vline(xintercept = 0)+
+  geom_hline(yintercept = 0)+
+  scale_color_manual(values = colorRampPalette(colors = c("#4DB3E6","#00B399","#E69900","#CC80B3","#132B41"))(9))
+
+pdf("./000.Final_Scripts/005.Cluster follow-up/Effect size comparison Lipidomics.pdf", width=10, height=3)
+ggplot(pd, aes(x=unadj*-1, y=adj*-1, col=Group, label=label))+
+  geom_point(size=2)+
+  facet_grid(~cluster)+
+  geom_smooth(method = "lm", se=F)+
+  geom_vline(xintercept = 0)+
+  geom_hline(yintercept = 0)+
+  scale_color_manual(values = colorRampPalette(colors = c("#4DB3E6","#00B399","#E69900","#CC80B3","#132B41"))(9))+
+  #grepel::geom_label_repel()+
+  #theme(legend.position = "none")+
+  xlab("Beta unadjusted model")+
+  ylab("Beta adjusted model")
+dev.off()
+``` 
+

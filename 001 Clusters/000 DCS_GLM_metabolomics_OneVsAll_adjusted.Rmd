@@ -7,7 +7,7 @@ output: md_document
 
 ## Load packages
 
-```{r setup, message=FALSE, eval=FALSE}
+```{r setup, message=FALSE, eval=TRUE}
 library(datashieldclient)
 library(dsBaseClient)
 library(dsSwissKnifeClient)
@@ -22,7 +22,7 @@ knitr::opts_knit$set(root.dir = "D:/001_Projects/001_RHAPSODY/")
 
 ## Login
 
-```{r login, message=F, eval=FALSE}
+```{r login, message=F, eval=TRUE}
 source("D:/001_Projects/001_RHAPSODY/001.Scripts/001 New utils/Utils_CoxModels.R")
 source("D:/001_Projects/001_RHAPSODY/001.Scripts/001 New utils/Utils_GB.R")
 source("D:/001_Projects/001_RHAPSODY/001.Scripts/001 New utils/Utils.R")
@@ -38,7 +38,7 @@ assign("opal",datashield.login(logins), envir = .GlobalEnv)
  
 ## Load data
 
-```{r load, eval=FALSE}
+```{r load, eval=TRUE}
 #Select required attributes 
 myAttributes <- c("METABOLOMICS","CLUSTER","SEX","AGE","BMI","HBA1C","HDL","LDL","TRIG","CPEPTIDE")
 myTransform <-c(3,rep(0, length(myAttributes)-1))
@@ -48,7 +48,7 @@ prepareData(assign="ModelData",opal=opal,attributes=myAttributes,cohort = "dcs",
 
 # Run models 
 
-```{r linreg, message=FALSE, eval=FALSE}
+```{r linreg, message=FALSE, eval=TRUE}
 metabolites <- ds.colnames('ModelData')$dcs
 metabolites <- metabolites[which(metabolites == "LBTESTCD.AADA"):which(metabolites == "LBTESTCD.UDCA")]
 
@@ -71,11 +71,11 @@ save(DCS.metabolites.SIDD.adj,
      file="./000.Final_Scripts/002.Clusters.Data/Metabolites GLM_models across clusters_FDB_DCS_OneVsAll_adjusted.RData")
 ```
 
-```{r, eval=FALSE, echo=FALSE}
+```{r, eval=TRUE, echo=FALSE}
 load("./000.Final_Scripts/002.Clusters.Data/Metabolites GLM_models across clusters_FDB_DCS_OneVsAll.RData")
 ```
 
 
-```{r logout, echo=F, eval=FALSE}
+```{r logout, echo=F, eval=TRUE}
 datashield.logout(opal)
 ```

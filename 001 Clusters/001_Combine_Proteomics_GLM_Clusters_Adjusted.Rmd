@@ -1,0 +1,157 @@
+---
+title: "001_Combine_Peptides_GLM_Clusters Adjusted"
+author: "Gerard Bouland / Roderick Slieker"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: md_document
+---
+
+```{r setup, include=FALSE}
+setwd("D:/001_Projects/001_RHAPSODY/")
+knitr::opts_knit$set(root.dir = "D:/001_Projects/001_RHAPSODY/")
+```
+
+
+```{r, echo=FALSE, message=FALSE}
+library(meta)
+library(reshape2)
+library(ggplot2)
+library(knitr)
+library(survminer)
+library(survival)
+library(reshape2)
+library(viridis)
+library(ggplot2)
+library(NMF)
+
+source("D:/001_Projects/033 Final scripts RHAPSODY/999 Utils/Utils.R")
+
+
+source("./000.Final_Scripts/003.Utils/forestplot.R")
+source("./000.Final_Scripts/003.Utils/OmicCircos.R")
+
+load("./000.Final_Scripts/002.Clusters.Data/Peptides GLM_models across clusters_FDB_DCS_OneVsAll_adjusted.RData")
+load("./000.Final_Scripts/002.Clusters.Data/Peptides GLM_models across clusters_FDB_GoDARTS_OneVsAll_adjusted.RData")
+```
+
+```{r,echo=FALSE}
+tmp <- c(as.character(DCS.pept.SIDD.adj$var),
+         as.character(GoDARTS.pept.SIDD.adj$var))
+pept <- names(table(tmp)[table(tmp) == 2])
+
+#Update DCS
+results.SIDD.DCS  <- updateData(DCS.pept.SIDD.adj,pept)
+results.SIRD.DCS  <- updateData(DCS.pept.SIRD.adj,pept)
+results.MOD.DCS   <- updateData(DCS.pept.MOD.adj,pept)
+results.MDH.DCS <- updateData(DCS.pept.MDH.adj,pept)
+results.MDH.DCS_Trig <- updateData(DCS.pept.MDH.adj_TRIG,pept)
+
+#Update godarts
+results.SIDD.godarts  <- updateData(GoDARTS.pept.SIDD.adj,pept)
+results.SIRD.godarts  <- updateData(GoDARTS.pept.SIRD.adj,pept)
+results.MOD.godarts   <- updateData(GoDARTS.pept.MOD.adj,pept)
+results.MDH.godarts <- updateData(GoDARTS.pept.MDH.adj,pept)
+results.MDH.godarts_Trig <- updateData(GoDARTS.pept.MDH.adj_TRIG,pept)
+```
+
+```{r, echo=FALSE}
+meta.SIDD.Peptides_adjusted <- CombineGLMTwo(results.SIDD.DCS,results.SIDD.godarts,ColVar = "var",studyLabels = c("dcs","godarts"))
+meta.SIRD.Peptides_adjusted  <- CombineGLMTwo(results.SIRD.DCS,results.SIRD.godarts,ColVar = "var",studyLabels = c("dcs","godarts"))
+meta.MOD.Peptides_adjusted  <- CombineGLMTwo(results.MOD.DCS,results.MOD.godarts,ColVar = "var",studyLabels = c("dcs","godarts"))
+meta.MDH.Peptides_adjusted  <- CombineGLMTwo(results.MDH.DCS,results.MDH.godarts,ColVar = "var",studyLabels = c("dcs","godarts"))
+meta.MDH.Peptides_adjusted_trig  <- CombineGLMTwo(results.MDH.DCS_Trig,results.MDH.godarts_Trig,ColVar = "var",studyLabels = c("dcs","godarts"))
+```
+
+
+# Comparison
+
+```{r}
+load("./000.Final_Scripts/002.Clusters.Combine/Peptides_combine.RData")
+
+meta.SIDD.Peptides  <- updateData2(meta.SIDD.somalogic,pept)
+meta.SIDD.Peptides_adjusted  <- updateData2(meta.SIDD.Peptides_adjusted,pept)
+
+meta.SIRD.Peptides  <- updateData2(meta.SIRD.somalogic,pept)
+meta.SIRD.Peptides_adjusted  <- updateData2(meta.SIRD.Peptides_adjusted,pept)
+
+meta.MOD.Peptides  <- updateData2(meta.MOD.somalogic,pept)
+meta.MOD.Peptides_adjusted  <- updateData2(meta.MOD.Peptides_adjusted,pept)
+
+meta.MDH.Peptides <- updateData2(meta.MARDH.somalogic, pept)
+meta.MDH.Peptides_adjusted <- updateData2(meta.MDH.Peptides_adjusted, pept)
+meta.MDH.Peptides_adjusted_trig <- updateData2(meta.MDH.Peptides_adjusted_trig, pept)
+
+meta.SIDD.Peptides_adjusted$Group <-"SIDD"
+meta.SIRD.Peptides_adjusted$Group <-"SIRD"
+meta.MOD.Peptides_adjusted$Group <-"MOD"
+meta.MDH.Peptides_adjusted$Group <-"MDH"
+meta.MDH.Peptides_adjusted_trig$Group <-"MDH (trig)"
+```
+
+
+```{r}
+table(meta.SIDD.Peptides_adjusted$var == meta.SIDD.Peptides$var)
+
+pd <- data.frame(
+  var = c(
+    as.character(meta.SIDD.Peptides_adjusted$var), 
+    as.character(meta.SIRD.Peptides_adjusted$var), 
+    as.character(meta.MOD.Peptides_adjusted$var), 
+    as.character(meta.MDH.Peptides_adjusted$var),
+    as.character(meta.MDH.Peptides_adjusted_trig$var)
+  ),
+  
+  cluster = c(meta.SIDD.Peptides_adjusted$Group, 
+              meta.SIRD.Peptides_adjusted$Group, 
+              meta.MOD.Peptides_adjusted$Group, 
+              meta.MDH.Peptides_adjusted$Group,
+              meta.MDH.Peptides_adjusted_trig$Group
+  ),
+  
+  unadj = c(
+    meta.SIDD.Peptides$Effect.random, 
+    meta.SIRD.Peptides$Effect.random, 
+    meta.MOD.Peptides$Effect.random, 
+    meta.MDH.Peptides$Effect.random,
+    meta.MDH.Peptides$Effect.random    
+  ),
+  
+  adj = c(
+    meta.SIDD.Peptides_adjusted$Effect.random,
+    meta.SIRD.Peptides_adjusted$Effect.random,
+    meta.MOD.Peptides_adjusted$Effect.random,
+    meta.MDH.Peptides_adjusted$Effect.random,
+    meta.MDH.Peptides_adjusted_trig$Effect.random
+  )
+)
+
+pd <- na.omit(pd)
+```
+
+```{r}
+pd$label <- NA
+pd[abs(pd$unadj) >= 0.4 & sign(pd$unadj) != sign(pd$adj),"label"] <- as.character(pd[abs(pd$unadj) >= 0.4 & sign(pd$unadj) != sign(pd$adj),"var"])
+pd$cluster <- factor(pd$cluster, levels=c("SIDD","SIRD","MOD","MDH","MDH (trig)"))
+
+ggplot(pd, aes(x=unadj*-1, y=adj*-1, col=cluster, group=var, label=var))+
+  geom_point()+
+  facet_grid(~cluster)+
+  geom_smooth(method="lm", se=F)+
+  geom_vline(xintercept = 0)+
+  geom_hline(yintercept = 0)+
+  scale_color_manual(values = c("#4DB3E6","#00B399","#E69900","#CC80B3","#132B41"))
+
+
+
+pdf("./000.Final_Scripts/005.Cluster follow-up/Effect size comparison Peptides.pdf", width=10, height=3)
+ggplot(pd, aes(x=unadj*-1, y=adj*-1, col=cluster, label=label))+
+  geom_point(size=2)+
+  facet_grid(~cluster)+
+  geom_smooth(method = "lm", se=F)+
+  geom_vline(xintercept = 0)+
+  geom_hline(yintercept = 0)+
+  scale_color_manual(values = c("#4DB3E6","#00B399","#E69900","#CC80B3","#132B41"))+
+  ggrepel::geom_label_repel()+
+  theme(legend.position = "none")
+dev.off()
+``` 
+

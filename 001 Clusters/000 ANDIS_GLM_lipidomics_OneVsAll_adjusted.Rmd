@@ -58,7 +58,7 @@ lipids <- lipids[2:171]
 # SIDD comparisons
 ANDIS.lipidomics.SIDD.adj  <- getModelForClusters(lipids, compCluster=2, refCluster="3,4,5,6", formula='ModelData.subset$%s~ModelData.subset$newCluster +  ModelData.subset$LBTESTCD.HBA1C')
 
-ANDIS.lipidomics.SIRD.adj  <- getModelForClusters(lipids, compCluster=3, refCluster="2,4,5,6", formula='ModelData.subset$%s~ModelData.subset$newCluster +  ModelData.subset$LBTESTCD.CPEPTIDE')
+ANDIS.lipidomics.SIRD.adj  <- getModelForClusters(lipids, compCluster=3, refCluster="2,4,5,6", formula='ModelData.subset$%s~ModelData.subset$newCluster +  ModelData.subset$LBTESTCD.CPEP')
 
 ANDIS.lipidomics.MOD.adj  <- getModelForClusters(lipids, compCluster=4, refCluster="2,3,5,6", formula='ModelData.subset$%s~ModelData.subset$newCluster +  ModelData.subset$VSTESTCD.BMI')
 
