@@ -6,7 +6,7 @@ output: md_document
 ---
 
 ```{r setup, include=FALSE}
-#setwd("D:/001_Projects/001_RHAPSODY/")
+setwd("D:/001_Projects/001_RHAPSODY/")
 knitr::opts_knit$set(root.dir = "D:/001_Projects/001_RHAPSODY/")
 ```
 
@@ -162,6 +162,14 @@ ggplot(pd, aes(x=unadj*-1, y=adj*-1, col=Group, group=var, label=var))+
   geom_vline(xintercept = 0)+
   geom_hline(yintercept = 0)+
   scale_color_manual(values = colorRampPalette(colors = c("#4DB3E6","#00B399","#E69900","#CC80B3","#132B41"))(9))
+
+df <- data.frame(MDH = pd[pd$cluster == "MDH",]$adj, MDH_Trig = pd[pd$cluster == "MDH (trig)",]$adj)
+
+pdf("./000.Final_Scripts/005.Cluster follow-up/Quick comparison of effect size.pdf")
+ggplot(df, aes(x=MDH, y=MDH_Trig))+
+  geom_point()+
+  geom_smooth(method=lm)
+dev.off()
 
 pdf("./000.Final_Scripts/005.Cluster follow-up/Effect size comparison Lipidomics.pdf", width=10, height=3)
 ggplot(pd, aes(x=unadj*-1, y=adj*-1, col=Group, label=label))+
