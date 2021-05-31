@@ -2,7 +2,7 @@
 title: "GLM model peptidomics data GoDARTS"
 author: "R.C.Slieker & G.A.Bouland"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
-output: html_document
+output: md_document
 ---
 
 ## Load packages

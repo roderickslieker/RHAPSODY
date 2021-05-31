@@ -1,0 +1,46 @@
+## Load packages
+
+    library(datashieldclient)
+    library(dsCDISCclient)
+    library(survminer)
+    library(survival)
+    library(reshape2)
+    library(viridis)
+
+    knitr::opts_knit$set(root.dir = "D:/001_Projects/001_RHAPSODY/")
+
+## Login
+
+    source("./000.Final_Scripts/003.Utils/Utils.R")
+    source("./000.Final_Scripts/003.Utils/Utils_GB.R")
+    source("./000.Final_Scripts/003.Utils/Utils_CoxModels.R")
+    datasource <- "opal"
+    loginpath <- "logindata_template.txt"
+    cohort <- "godarts"
+    logIn(datasource, loginpath, cohort)
+
+## Load data
+
+    #Select required attributes 
+    myAttributes <- c("SOMALOGIC","CLUSTER")
+    myTransform <-c(3,0)
+    prepareData(assign="ModelData",opal=opal,attributes=myAttributes,transformVector=myTransform)
+
+# Run models
+
+    peptides <- ds.colnames('ModelData')$godarts
+    peptides <- peptides[grep("SL0", peptides)]
+
+    # SIDD comparisons
+    GoDARTS.peptidomics.results.SIDD  <- getModelForClusters(peptides, compCluster=2, refCluster="3,4,5,6")
+    GoDARTS.peptidomics.results.SIRD  <- getModelForClusters(peptides, compCluster=3, refCluster="2,4,5,6")
+    GoDARTS.peptidomics.results.MOD  <- getModelForClusters(peptides, compCluster=4, refCluster="2,3,5,6")
+    GoDARTS.peptidomics.results.MARD  <- getModelForClusters(peptides, compCluster=5, refCluster="2,3,4,6")
+    GoDARTS.peptidomics.results.MARDH  <- getModelForClusters(peptides, compCluster=6, refCluster="2,3,4,5")
+
+    save(GoDARTS.peptidomics.results.SIDD, 
+         GoDARTS.peptidomics.results.SIRD, 
+         GoDARTS.peptidomics.results.MOD, 
+         GoDARTS.peptidomics.results.MARD, 
+         GoDARTS.peptidomics.results.MARDH, 
+         file="./000.Final_Scripts/002.Clusters.Data/Peptides GLM_models across clusters_FDB_GoDARTS_OneVsAll.RData")
