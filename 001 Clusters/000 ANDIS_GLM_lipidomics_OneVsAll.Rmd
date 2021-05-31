@@ -2,22 +2,21 @@
 title: "GLM model lipidomics andis"
 author: "Gerard Bouland / Roderick Slieker"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
-output: html_document
+output: md_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_knit$set(root.dir = "/Users/roderick/Documents/Projecten en papers/Rhapsody_FDB/")
-#knitr::opts_knit$set(root.dir = "/exports/molepi/users/gbouland/")
+knitr::opts_knit$set(root.dir = "D:/001_Projects/001_RHAPSODY/")
 ```
 
-```{r packs, message=FALSE, eval=TRUE}
+```{r packs, message=FALSE, eval=FALSE}
 library(datashieldclient)
 library(dsCDISCclient)
 library(survminer)
 library(survival)
 ```
 
-```{r login, message=F}
+```{r login, message=F,eval=FALSE}
 source("./000.Final_Scripts/003.Utils/Utils_GB.R")
 source("./000.Final_Scripts/003.Utils/Utils_CoxModels.R")
 loginpath <- "logindata_template.txt"
@@ -61,48 +60,6 @@ save(ANDIS.lipidomics.results.SIDD,
 
 ```{r,echo=FALSE}
 load("./000.Final_Scripts/002.Clusters.Data/Lipids GLM_models across clusters_FDB_ANDIS_OneVsAll.RData")
-```
-## Quick check, how many significant?
-
-### SIDD
-
-```{r}
-SIDD <- ANDIS.lipidomics.results.SIDD[ANDIS.lipidomics.results.SIDD$p.adj <= 0.05,]
-SIDD <- SIDD[order(SIDD$p.value),]
-knitr::kable(SIDD)
-```
-
-### SIRD 
-
-```{r}
-SIRD <- ANDIS.lipidomics.results.SIRD[ANDIS.lipidomics.results.SIRD$p.adj <= 0.05,]
-SIRD <- SIRD[order(SIRD$p.value),]
-knitr::kable(SIRD)
-```
-
-### MOD
-
-```{r}
-MOD <- ANDIS.lipidomics.results.MOD[ANDIS.lipidomics.results.MOD$p.adj <= 0.05,]
-MOD <- MOD[order(MOD$p.value),]
-knitr::kable(MOD)
-```
-
-### MARD
-
-```{r}
-MARD <- ANDIS.lipidomics.results.MARD[ANDIS.lipidomics.results.MARD$p.adj <= 0.05,]
-MARD <- MARD[order(MARD$p.value),]
-knitr::kable(MARD)
-head(MARD)
-```
-
-### MARDH
-
-```{r}
-MARDH <- ANDIS.lipidomics.results.MARDH[ANDIS.lipidomics.results.MARDH$p.adj <= 0.05,]
-MARDH<- MARDH[order(MARDH$p.value),]
-knitr::kable(MARDH)
 ```
 
 ```{r logout, echo=F, eval=FALSE}
