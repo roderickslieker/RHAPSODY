@@ -1,4 +1,8 @@
+## Clusters
+
 ### 1.Metabolomics
+
+Unadjusted
 
 [DCS
 unadjusted](https://github.com/roderickslieker/RHAPSODY/blob/master/001%20Clusters/000-DCS_GLM_metabolomics_OneVsAll.md)
@@ -7,7 +11,9 @@ unadjusted](https://github.com/roderickslieker/RHAPSODY/blob/master/001%20Cluste
 unadjusted](https://github.com/roderickslieker/RHAPSODY/blob/master/001%20Clusters/000-GoDARTS_GLM_metabolomics_OneVsAll.md)
 
 [ANDIS
-unadjusted](https://github.com/roderickslieker/RHAPSODY/blob/master/001%20Clusters/000-ANDIS_GLM_metabolomics_OneVsAll.md)
+unadjusted](https://github.com/roderickslieker/RHAPSODY/blob/master/001%20Clusters/000%20ANDIS_GLM_metabolomics%20_OneVsAll.Rmd)
+
+Unadjusted
 
 [DCS
 adjusted](https://github.com/roderickslieker/RHAPSODY/blob/master/001%20Clusters/000-DCS_GLM_metabolomics_OneVsAll_adjusted.md)
@@ -20,19 +26,19 @@ adjusted](https://github.com/roderickslieker/RHAPSODY/blob/master/001%20Clusters
 
 #### Meta-analysis
 
-[Meta-analysis
-adjusted](https://github.com/roderickslieker/RHAPSODY/blob/master/001%20Clusters/001_Combine_Metabolomics_GLM_Clusters.md)
+[Metabolomics
+unadjusted](https://github.com/roderickslieker/RHAPSODY/blob/master/001%20Clusters/001%20Combine_Metabolomics_GLM_Clusters.md)
 
-[Meta-analysis
+[Metabolomics
 adjusted](https://github.com/roderickslieker/RHAPSODY/blob/master/001%20Clusters/001_Combine_Metabolomics_GLM_Clusters_Adjusted.md)
 
 ### 2.Lipidomics
 
 [DCS
-unadjusted](https://github.com/roderickslieker/RHAPSODY/blob/master/001%20Clusters/000-DCS_GLM_lipidomics_OneVsAll.md)
+unadjusted](https://github.com/roderickslieker/RHAPSODY/blob/master/001%20Clusters/000%20DCS_GLM_lipidomics_OneVsAll.md)
 
 [GoDARTS
-unadjusted](https://github.com/roderickslieker/RHAPSODY/blob/master/001%20Clusters/000-GoDARTS_GLM_lipidomics_OneVsAll.md)
+unadjusted](https://github.com/roderickslieker/RHAPSODY/blob/master/001%20Clusters/000%20GoDARTS_GLM_metabolomics_OneVsAll.Rmd)
 
 [ANDIS
 unadjusted](https://github.com/roderickslieker/RHAPSODY/blob/master/001%20Clusters/000-ANDIS_GLM_lipidomics_OneVsAll.md)
@@ -45,3 +51,11 @@ adjusted](https://github.com/roderickslieker/RHAPSODY/blob/master/001%20Clusters
 
 [ANDIS
 adjusted](https://github.com/roderickslieker/RHAPSODY/blob/master/001%20Clusters/000-ANDIS_GLM_lipidomics_OneVsAll_adjusted.md)
+
+#### Meta-analysis
+
+[Lipidomics
+unadjusted](https://github.com/roderickslieker/RHAPSODY/blob/master/001%20Clusters/001%20Combine_Lipidomics_GLM_Clusters.md)
+
+[Lipidomics
+adjusted](https://github.com/roderickslieker/RHAPSODY/blob/master/001%20Clusters/001_Combine_Lipidomics_GLM_Clusters_Adjusted.md)
