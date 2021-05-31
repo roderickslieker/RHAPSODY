@@ -1,0 +1,554 @@
+---
+title: "Meta-analysis Metabolomics_GLM_Clusters"
+author: "Gerard Bouland / Roderick Slieker"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: md_document
+---
+
+```{r setup, include=FALSE, eval=FALSE}
+#knitr::opts_knit$set(root.dir = "/Users/roderick/Documents/Projecten en papers/Rhapsody_FDB/000.Final_Scripts/")
+knitr::opts_knit$set(root.dir = "Z:/Roderick/001 Projects/Rhapsody/001.1 Federated analyses/000.Final_Scripts/")
+```
+
+
+```{r, echo=FALSE, message=FALSE, eval=FALSE}
+library(meta)
+library(reshape2)
+library(ggplot2)
+library(knitr)
+library(datashieldclient)
+library(dsCDISCclient)
+library(survminer)
+library(survival)
+library(reshape2)
+library(viridis)
+library(ggplot2)
+library(NMF)
+library(OmicCircos)
+
+source("./003.Utils/forestplot.R")
+source("./003.Utils/OmicCircos.R")
+
+load("./002.Clusters.Data/Metabolites GLM_models across clusters_FDB_DCS_OneVsAll.RData")
+load("./002.Clusters.Data/Metabolites GLM_models across clusters_FDB_GoDARTS_OneVsAll.RData")
+load("./002.Clusters.Data/Metabolites GLM_models across clusters_FDB_ANDIS_OneVsAll.RData")
+```
+
+```{r PlotFunction, echo=FALSE, eval=FALSE}
+get.plot <- function(dataDCS, dataGODARTS, title, cohortLabels, ymin, ymax, xmin, xmax)
+{
+  pd <- data.frame(Beta.DCS = dataDCS$Estimate, Beta.GoDARTS = dataGODARTS$Estimate)
+  pd$Sign <- ifelse(dataDCS$p.adj <= 0.05 & dataGODARTS$p.adj <= 0.05, "Sign", "NonSign")
+  
+  pd$label <- ifelse(pd$Sign == "Sign", NA, NA)
+  
+  minx <- round(min(c(pd$Beta.DCS, pd$Beta.GoDARTS)), 1)
+  maxx <- round(max(c(pd$Beta.DCS, pd$Beta.GoDARTS)), 1)
+  
+  P <- ggplot(pd, aes(x=Beta.DCS, y=Beta.GoDARTS, label=label))+
+    geom_point()+
+    geom_text()+
+    #scale_colour_manual(values = viridis::viridis_pal()(length(unique(cols))))+
+    xlab(paste("Estimate",cohortLabels[1]))+
+    ylab(paste("Estimate",cohortLabels[2]))+
+    ggtitle(title)+
+    geom_smooth(method=lm, col='black')+
+    geom_vline(xintercept = 0)+
+    geom_hline(yintercept = 0)+
+    xlim(xmin, xmax)+ylim(ymin, ymax)
+
+  return(P)
+}
+```
+
+```{r getMean, echo=FALSE, eval=FALSE}
+#load mean levels data
+load("./000.Mean.Levels.Data/DCS_Metabolomics_Mean_Levels.RData")
+load("./000.Mean.Levels.Data/GoDARTS_Metabolomics_Mean_Levels.RData")
+load("./000.Mean.Levels.Data/Andis_Metabolomics_Mean_Levels.RData")
+
+DCS_Metabolomics_Mean_Levels$lip <- gsub("LBTESTCD.","",DCS_Metabolomics_Mean_Levels$lip)
+DCS_Melt <- melt(DCS_Metabolomics_Mean_Levels, id.vars = c("Mean","lip","cluster", "cohort"))
+
+GoDARTS_Metabolomics_Mean_Levels$lip <- gsub("LBTESTCD.","",GoDARTS_Metabolomics_Mean_Levels$lip)
+GoDARTS_Melt<- melt(GoDARTS_Metabolomics_Mean_Levels, id.vars = c("Mean","lip","cluster", "cohort"))
+
+Andis_Metabolomics_Mean_Levels$lip <- gsub("LBTESTCD.","",Andis_Metabolomics_Mean_Levels$lip)
+Andis_Melt <- melt(Andis_Metabolomics_Mean_Levels, id.vars =c("Mean","lip","cluster", "cohort"))
+
+```
+
+
+```{r GLMCombine, echo=FALSE, eval=FALSE}
+CombineGLM <- function(Data01, Data02, Data03, ColVar, studyLabels){
+  #Check if dataframes have equal number of rows
+  if(!nrow(Data01) == nrow(Data02)){
+    stop("Dataframes are not of equal length")
+  }
+  #Check if variables are equal and in same order
+  if(!table(as.character(Data01[,ColVar]) == as.character(Data02[,ColVar]))==nrow(Data01)){
+    stop("Variables of dataframes are not in same order")
+  }
+  if(!table(as.character(Data01[,ColVar]) == as.character(Data03[,ColVar]))==nrow(Data01)){
+    stop("Variables of dataframes are not in same order")
+  }
+  
+  combined <- data.frame()
+  variables <-as.character(Data01[,ColVar])
+  
+  for(i in seq_along(variables)){
+    var <- variables[i]
+    tmp.merge <- rbind(Data01[Data01[,ColVar] == var,],
+                       Data02[Data02[,ColVar] == var,],
+                       Data03[Data03[,ColVar] == var,])
+    
+
+    tmp.combined <- metagen(TE = tmp.merge$Estimate, seTE = tmp.merge$Std..Error, studlab = studyLabels, comb.fixed = TRUE, comb.random = TRUE)
+    cis <- ci(TE = tmp.combined$TE.random, seTE = tmp.combined$seTE.random, level=0.95, df=NULL, null.effect = 0)
+    summ <- data.frame(var,
+                      Effect.random = tmp.combined$TE.random,
+                      lower = cis$lower,
+                      upper = cis$upper,
+                      Zval.random = tmp.combined$zval.random,
+                      Pval.random  = tmp.combined$pval.random,
+                      I2 = summary(tmp.combined)$I2$TE,
+                      Het = pchisq(tmp.combined$Q,1, lower.tail=F))
+    
+    combined <- rbind(combined,summ)
+  }
+  combined <- combined[order(combined$Pval.random, decreasing=F),]
+  combined$fdr.random <- p.adjust(combined$Pval.random,method="fdr")
+  return(combined)
+}
+```
+
+```{r, echo=FALSE, eval=FALSE}
+updateData <- function(data,varNames){
+  data <- data[match(varNames, data$var),]
+  data$p.adj <- p.adjust(data$p.value,'fdr')
+  return(data)
+}
+```
+
+```{r histo, echo=FALSE, eval=FALSE}
+cols <- c("#132B41","#009AC6","#E1B70A","#B81E3D","#878786")
+
+getPlot <- function(cohorts, var, title=NULL, breaks=NULL){
+  dataframes <- lapply(cohorts,function(co){get(co)[get(co)$lip == var,]})
+  pd <- do.call(rbind,dataframes)
+  pdx <- pd[pd$variable %in% c("25%","75%","50%"),]
+  pdx.t <- pdx[pdx$variable %in% "25%",]
+  pdx.t <- pdx.t[,-(c(ncol(pdx.t)-1):ncol(pdx.t))]
+  pdx.t$v25 <- pdx[pdx$variable %in% "25%","value"]
+  pdx.t$v50 <- pdx[pdx$variable %in% "50%","value"]
+  pdx.t$v75 <- pdx[pdx$variable %in% "75%","value"]
+  
+  conv <- data.frame(id = 2:6,
+                     name = c("1/SIDD","2/SIRD","3/MOD","4/MD","5/MDH"))
+  pdx.t$Cluster <- conv[match(pdx.t$cluster, conv$id),"name"]
+  
+  pdx.t$cohort2 <- toupper(substr(pdx.t$cohort, 1, 1))
+  pdx.t$cohort <- factor(pdx.t$cohort, levels=c("dcs","godarts","andis"))
+  p1 <- ggplot(pdx.t, aes(x=factor(Cluster), y=v50))+
+    geom_point(size=2, position=position_dodge2(width=  0.4), aes(col=Cluster, group=cohort))+
+    geom_errorbar(aes(x=Cluster, ymin=v25, ymax=v75, col=Cluster, group=cohort), width=0, position=position_dodge(width = 0.4))+
+    scale_y_continuous(trans="log10")+#, limits = c(min(pdx.t$v25)/1.5,max(pdx.t$v75)*1.5))+
+    scale_colour_manual(values = cols)+
+    #geom_text(aes(x=Cluster, y=v75*1.04, label=cohort2), position=position_dodge2(width=0.4))+
+    ylab("Levels")+
+    xlab("Cluster")+
+    facet_wrap(~cohort, scale="free_y")+
+    theme(legend.position = "none")
+  
+  if(!is.null(title))
+  {
+    p1 <- p1+ggtitle(title)
+  }
+  if(!is.null(breaks))
+  {
+    p1 <- p1+scale_y_continuous(trans="log10",breaks=breaks)
+  }
+  
+  pdf(sprintf("../003.Figures.combined/Plot_of_%s.pdf", var), width=8, height=3)
+  print(p1)
+  dev.off()
+  return(p1)
+}
+```
+
+```{r,echo=FALSE, eval=FALSE}
+tmp <- c(as.character(ANDIS.metabolomics.results.SIDD$var),
+         as.character(DCS.metabolomics.results.SIDD$var),
+         as.character(GoDARTS.metabolomics.results.SIDD$var))
+metabolites <- names(table(tmp)[table(tmp) == 3])
+
+#Update DCS
+results.SIDD.DCS  <- updateData(DCS.metabolomics.results.SIDD,metabolites)
+results.SIRD.DCS  <- updateData(DCS.metabolomics.results.SIRD,metabolites)
+results.MOD.DCS   <- updateData(DCS.metabolomics.results.MOD,metabolites)
+results.MARD.DCS  <- updateData(DCS.metabolomics.results.MARD,metabolites)
+results.MARDH.DCS <- updateData(DCS.metabolomics.results.MARDH,metabolites)
+
+#Update GoDARTS
+results.SIDD.GoDARTS  <- updateData(GoDARTS.metabolomics.results.SIDD,metabolites)
+results.SIRD.GoDARTS  <- updateData(GoDARTS.metabolomics.results.SIRD,metabolites)
+results.MOD.GoDARTS   <- updateData(GoDARTS.metabolomics.results.MOD,metabolites)
+results.MARD.GoDARTS  <- updateData(GoDARTS.metabolomics.results.MARD,metabolites)
+results.MARDH.GoDARTS <- updateData(GoDARTS.metabolomics.results.MARDH,metabolites)
+
+#Update Andis
+results.SIDD.ANDIS  <- updateData(ANDIS.metabolomics.results.SIDD,metabolites)
+results.SIRD.ANDIS  <- updateData(ANDIS.metabolomics.results.SIRD,metabolites)
+results.MOD.ANDIS   <- updateData(ANDIS.metabolomics.results.MOD,metabolites)
+results.MARD.ANDIS  <- updateData(ANDIS.metabolomics.results.MARD,metabolites)
+results.MARDH.ANDIS <- updateData(ANDIS.metabolomics.results.MARDH,metabolites)
+```
+
+```{r, echo=FALSE, eval=FALSE}
+meta.SIDD.metabolomics <- CombineGLM(results.SIDD.DCS,results.SIDD.GoDARTS,results.SIDD.ANDIS,ColVar = "var",studyLabels = c("dcs","godarts","andis"))
+meta.SIRD.metabolomics  <- CombineGLM(results.SIRD.DCS,results.SIRD.GoDARTS,results.SIRD.ANDIS,ColVar = "var",studyLabels = c("dcs","godarts","andis"))
+meta.MOD.metabolomics  <- CombineGLM(results.MOD.DCS,results.MOD.GoDARTS,results.MOD.ANDIS,ColVar = "var",studyLabels = c("dcs","godarts","andis"))
+meta.MARD.metabolomics  <- CombineGLM(results.MARD.DCS,results.MARD.GoDARTS,results.MARD.ANDIS,ColVar = "var",studyLabels = c("dcs","godarts","andis"))
+meta.MARDH.metabolomics  <- CombineGLM(results.MARDH.DCS,results.MARDH.GoDARTS,results.MARDH.ANDIS,ColVar = "var",studyLabels = c("dcs","godarts","andis"))
+```
+
+
+
+```{r, eval=FALSE}
+head(results.SIDD.DCS)
+head(results.SIDD.GoDARTS)
+
+
+pd <- data.frame(Cluster = factor(rep(c("SIDD","SIRD","MOD","MD","MDH"), each=nrow(results.SIDD.DCS)), levels=c("SIDD","SIRD","MOD","MD","MDH")), 
+                 DCS = c(results.SIDD.DCS$Estimate, results.SIRD.DCS$Estimate, results.MOD.DCS$Estimate, results.MARD.DCS$Estimate, results.MARDH.DCS$Estimate),
+                 GoDARTS = c(results.SIDD.GoDARTS$Estimate, results.SIRD.GoDARTS$Estimate, results.MOD.GoDARTS$Estimate, results.MARD.GoDARTS$Estimate, results.MARDH.GoDARTS$Estimate),
+                 ANDIS = c(results.SIDD.ANDIS$Estimate, results.SIRD.ANDIS$Estimate, results.MOD.ANDIS$Estimate, results.MARD.ANDIS$Estimate, results.MARDH.ANDIS$Estimate))
+                 
+a1 <- rbind(
+  ggplotGrob(
+    ggplot(pd, aes(x=DCS, y=GoDARTS))+
+    geom_point()+
+    facet_grid(~Cluster)+
+    geom_vline(xintercept = 0)+
+    geom_hline(yintercept = 0)+
+    geom_smooth(method=lm)
+  ),ggplotGrob(
+    ggplot(pd, aes(x=DCS, y=ANDIS))+
+    geom_point()+
+    facet_grid(~Cluster)+
+    geom_vline(xintercept = 0)+
+    geom_hline(yintercept = 0)+
+    geom_smooth(method=lm)
+  ),ggplotGrob(
+    ggplot(pd, aes(x=GoDARTS, y=ANDIS))+
+    geom_point()+
+    facet_grid(~Cluster)+
+    geom_vline(xintercept = 0)+
+    geom_hline(yintercept = 0)+
+    geom_smooth(method=lm)
+), size="first")
+
+pdf("Comparison of effect size_metabolomics.pdf", width=10, height=10)
+plot(a1)
+dev.off()
+```
+
+
+## SIDD
+```{r,warning=FALSE,echo=FALSE, eval=FALSE}
+load("./002.Clusters.Data/ClusterSizes.RData")
+knitr::kable(meta.SIDD.metabolomics [meta.SIDD.metabolomics $fdr.random < 0.05,])
+table(meta.SIDD.metabolomics $fdr.random < 0.05)
+get.plot(results.SIDD.DCS,results.SIDD.GoDARTS,"Estimates SIDD",c("DCS","GoDARTS"),-0.5,0.5,-0.5,0.5)
+get.plot(results.SIDD.DCS,results.SIDD.ANDIS,"Estimates SIDD",c("DCS","ANDIS"),-0.5,0.5,-0.5,0.5)
+get.plot(results.SIDD.GoDARTS,results.SIDD.ANDIS,"Estimates SIDD",c("GoDARTS","ANDIS"),-0.5,0.5,-0.5,0.5)
+
+
+
+```
+
+```{r,warning=FALSE,echo=FALSE, fig.width=9, fig.height=4, eval=FALSE}
+#knitr::include_graphics(path = 'Z:/Roderick/001 Projects/Rhapsody/001.1 Federated analyses/000.Final_Scripts/002.Clusters.Combine/ForestPlots Metabolites/Tyr_SIDD_forest.png')
+getPlot(cohorts = c("DCS_Melt","GoDARTS_Melt","Andis_Melt"),var = "Tyr", title = "Tyrosine", breaks=c(8000,10000,12000,14000))
+getPlot(c("DCS_Melt","GoDARTS_Melt","Andis_Melt"),"AADA", title="AADA")
+getPlot(cohorts = c("DCS_Melt","GoDARTS_Melt","Andis_Melt"),var = "Ile", title = "Isoleucine", breaks=c(10000,15000,20000,25000))
+
+getPlot(cohorts = c("DCS_Melt","GoDARTS_Melt","Andis_Melt"),var = "SDMA.ADMA", title = "Symmetric Asymmetric dimethylarginine")
+
+
+```
+
+
+```{r,fig.width=9,fig.height=3, eval=FALSE}
+
+getForestPlotGLM(Data01 = results.SIDD.DCS,
+                 Data02 = results.SIDD.GoDARTS,
+                 Data03 = results.SIDD.ANDIS,
+                 Meta = meta.SIDD.metabolomics,
+                 variable = "Tyr",
+                 omic = "metabolomics")
+getForestPlotGLM(Data01 = results.SIDD.DCS,
+                 Data02 = results.SIDD.GoDARTS,
+                 Data03 = results.SIDD.ANDIS,
+                 Meta = meta.SIDD.metabolomics,
+                 variable = "SDMA.ADMA",
+                 omic = "metabolomics")
+
+getForestPlotGLM(Data01 = results.SIDD.DCS,
+                 Data02 = results.SIDD.GoDARTS,
+                 Data03 = results.SIDD.ANDIS,
+                 Meta = meta.SIDD.metabolomics,
+                 variable = "SDMA.ADMA",
+                 omic = "metabolomics")
+
+
+
+pdf("../003.Figures.combined/Forest plot Tyr.pdf", width=10, height=3)
+getForestPlotGLM(Data01 = results.SIDD.DCS,
+                 Data02 = results.SIDD.GoDARTS,
+                 Data03 = results.SIDD.ANDIS,
+                 Meta = meta.SIDD.metabolomics,
+                 variable = "Tyr",
+                 omic = "metabolomics")
+dev.off()
+
+```
+
+## SIRD
+
+```{r,warning=FALSE,echo=FALSE, eval=FALSE}
+knitr::kable(meta.SIRD.metabolomics [meta.SIRD.metabolomics $fdr.random < 0.05,])
+table(meta.SIRD.metabolomics $fdr.random < 0.05)
+
+
+get.plot(results.SIRD.DCS,results.SIRD.GoDARTS,"Estimates SIRD",c("DCS","GoDARTS"),-0.5,0.5,-0.5,0.5)
+get.plot(results.SIRD.DCS,results.SIRD.ANDIS,"Estimates SIRD",c("DCS","ANDIS"),-0.5,0.5,-0.5,0.5)
+get.plot(results.SIRD.GoDARTS,results.SIRD.ANDIS,"Estimates SIRD",c("GoDARTS","ANDIS"),-0.5,0.5,-0.5,0.5)
+```
+
+```{r,warning=FALSE,echo=FALSE, fig.width=9, fig.height=4, eval=FALSE}
+getPlot(c("DCS_Melt","GoDARTS_Melt","Andis_Melt"),"Tyr")
+getPlot(c("DCS_Melt","GoDARTS_Melt","Andis_Melt"),"Leu")
+getPlot(c("DCS_Melt","GoDARTS_Melt","Andis_Melt"),"Ile")
+```
+
+```{r,fig.width=9,fig.height=3, eval=FALSE}
+getForestPlotGLM(Data01 = results.SIRD.DCS,
+                 Data02 = results.SIRD.GoDARTS,
+                 Data03 = results.SIRD.ANDIS,
+                 Meta = meta.SIRD.metabolomics,
+                 variable = "Tyr",
+                 omic = "metabolomics")
+getForestPlotGLM(Data01 = results.SIRD.DCS,
+                 Data02 = results.SIRD.GoDARTS,
+                 Data03 = results.SIRD.ANDIS,
+                 Meta = meta.SIRD.metabolomics,
+                 variable = "Leu",
+                 omic = "metabolomics")
+
+getForestPlotGLM(Data01 = results.SIRD.DCS,
+                 Data02 = results.SIRD.GoDARTS,
+                 Data03 = results.SIRD.ANDIS,
+                 Meta = meta.SIRD.metabolomics,
+                 variable = "Ile",
+                 omic = "metabolomics")
+
+getForestPlotGLM(Data01 = results.SIRD.DCS,
+                 Data02 = results.SIRD.GoDARTS,
+                 Data03 = results.SIRD.ANDIS,
+                 Meta = meta.SIRD.metabolomics,
+                 variable = "AADA",
+                 omic = "metabolomics")
+```
+
+
+## MOD
+```{r,warning=FALSE,echo=FALSE, fig.width=9, fig.height=4, eval=FALSE}
+knitr::kable(meta.MOD.metabolomics [meta.MOD.metabolomics $fdr.random < 0.05,])
+table(meta.MOD.metabolomics $fdr.random < 0.05)
+get.plot(results.MOD.DCS,results.MOD.GoDARTS,"Estimates MOD",c("DCS","GoDARTS"),-0.5,0.5,-0.5,0.5)
+get.plot(results.MOD.DCS,results.MOD.ANDIS,"Estimates MOD",c("DCS","ANDIS"),-0.5,0.5,-0.5,0.5)
+get.plot(results.MOD.GoDARTS,results.MOD.ANDIS,"Estimates MOD",c("GoDARTS","ANDIS"),-0.5,0.5,-0.5,0.5)
+getPlot(c("DCS_Melt","GoDARTS_Melt","Andis_Melt"),"Ile")
+```
+
+```{r,fig.width=9,fig.height=3, eval=FALSE}
+getForestPlotGLM(Data01 = results.MOD.DCS,
+                 Data02 = results.MOD.GoDARTS,
+                 Data03 = results.MOD.ANDIS,
+                 Meta = meta.MOD.metabolomics,
+                 variable = "Ile",
+                 omic = "metabolomics")
+
+```
+
+## MARD
+```{r,warning=FALSE,echo=FALSE, fig.width=9, fig.height=4, eval=FALSE}
+knitr::kable(meta.MARD.metabolomics [meta.MARD.metabolomics$fdr.random < 0.05,])
+table(meta.MARD.metabolomics $fdr.random < 0.05)
+get.plot(results.MARD.DCS,results.MARD.GoDARTS,"Estimates MARD",c("DCS","GoDARTS"),-0.5,0.5,-0.5,0.5)
+get.plot(results.MARD.DCS,results.MARD.ANDIS,"Estimates MARD",c("DCS","ANDIS"),-0.5,0.5,-0.5,0.5)
+get.plot(results.MARD.GoDARTS,results.MARD.ANDIS,"Estimates MARD",c("GoDARTS","ANDIS"),-0.5,0.5,-0.5,0.5)
+```
+
+## MARDH
+```{r,warning=FALSE,echo=FALSE, fig.width=9, fig.height=4, eval=FALSE}
+knitr::kable(meta.MARDH.metabolomics [meta.MARDH.metabolomics $fdr.random < 0.05,])
+table(meta.MARDH.metabolomics $fdr.random < 0.05)
+get.plot(results.MARDH.DCS,results.MARDH.GoDARTS,"Estimates MARDH",c("DCS","GoDARTS"),-0.5,0.5,-0.5,0.5)
+get.plot(results.MARDH.DCS,results.MARDH.ANDIS,"Estimates MARDH",c("DCS","ANDIS"),-0.5,0.5,-0.5,0.5)
+get.plot(results.MARDH.GoDARTS,results.MARDH.ANDIS,"Estimates MARDH",c("GoDARTS","ANDIS"),-0.5,0.5,-0.5,0.5)
+getPlot(c("DCS_Melt","GoDARTS_Melt","Andis_Melt"),"Ile")
+getPlot(c("DCS_Melt","GoDARTS_Melt","Andis_Melt"),"Taurine")
+```
+
+```{r,fig.width=9,fig.height=3, eval=FALSE}
+getForestPlotGLM(Data01 = results.MARDH.DCS,
+                 Data02 = results.MARDH.GoDARTS,
+                 Data03 = results.MARDH.ANDIS,
+                 Meta = meta.MARDH.metabolomics,
+                 variable = "Ile",
+                 omic = "metabolomics")
+
+getForestPlotGLM(Data01 = results.MARDH.DCS,
+                 Data02 = results.MARDH.GoDARTS,
+                 Data03 = results.MARDH.ANDIS,
+                 Meta = meta.MARDH.metabolomics,
+                 variable = "Taurine",
+                 omic = "metabolomics")
+```
+
+```{r, eval=FALSE}
+save(meta.SIDD.metabolomics,file="Metabolomics_Clusters_Meta_SIDD.RData")
+save(meta.SIRD.metabolomics,file="Metabolomics_Clusters_Meta_SIRD.RData")
+save(meta.MOD.metabolomics,file="Metabolomics_Clusters_Meta_MOD.RData")
+save(meta.MARD.metabolomics,file="Metabolomics_Clusters_Meta_MARD.RData")
+save(meta.MARDH.metabolomics,file="Metabolomics_Clusters_Meta_MARDH.RData")
+
+
+meta.SIDD.metabolomics$group <- "SIDD"
+meta.SIRD.metabolomics$group <- "SIRD"
+meta.MOD.metabolomics$group <- "MOD"
+meta.MARD.metabolomics$group <- "MD"
+meta.MARDH.metabolomics$group <- "MDH"
+
+
+out <- rbind(
+  meta.SIDD.metabolomics[meta.SIDD.metabolomics$fdr.random <= 0.05,],
+  meta.SIRD.metabolomics[meta.SIRD.metabolomics$fdr.random <= 0.05,],
+  meta.MOD.metabolomics[meta.MOD.metabolomics$fdr.random <= 0.05,],
+  meta.MARD.metabolomics[meta.MARD.metabolomics$fdr.random <= 0.05,],
+  meta.MARDH.metabolomics[meta.MARDH.metabolomics$fdr.random <= 0.05,]
+  )
+
+rio::export(out, file="Metabolomics clusters out.xlsx")
+```
+
+## Get heatmap of meta-estimates.
+
+```{r, eval=FALSE}
+
+
+vars <- metabolites
+
+ #Make sign matrix
+sign.matrix <- matrix(rep(0), ncol=5, nrow=length(vars))
+colnames(sign.matrix) <- c("SIDD","SIRD","MOD","MARD","MARDH")
+rownames(sign.matrix) <- vars
+
+
+sign.matrix[match(meta.SIDD.metabolomics$var, rownames(sign.matrix)), 1] <- 1
+sign.matrix[match(meta.SIRD.metabolomics$var, rownames(sign.matrix)), 2] <- 1
+sign.matrix[match(meta.MOD.metabolomics$var, rownames(sign.matrix)), 3] <- 1
+sign.matrix[match(meta.MARD.metabolomics$var, rownames(sign.matrix)), 4] <- 1
+sign.matrix[match(meta.MARDH.metabolomics$var, rownames(sign.matrix)), 5] <- 1
+estimates <- data.frame(
+          SIDD = meta.SIDD.metabolomics[match(vars, meta.SIDD.metabolomics$var),"Effect.random"],
+          SIRD = meta.SIRD.metabolomics[match(vars, meta.SIRD.metabolomics$var),"Effect.random"],
+          MOD = meta.MOD.metabolomics[match(vars, meta.MOD.metabolomics$var),"Effect.random"],
+          MARD = meta.MARD.metabolomics[match(vars, meta.MARD.metabolomics$var),"Effect.random"],
+          MARDH = meta.MARDH.metabolomics[match(vars, meta.MARDH.metabolomics$var),"Effect.random"])
+
+
+rownames(estimates) <- vars
+
+# Estimates are inverted 
+estimates <- estimates*-1
+
+# Functions for correlation
+hclust2 <- function(x, method="average", ...)
+	hclust(x, method=method, ...)
+dist2 <- function(x, ...)
+	as.dist(1-cor(t(x)))
+  
+
+
+aheatmap(data.matrix(estimates), hclustfun = hclust2, distfun =dist2, Colv=NA,  
+         annRow = sign.matrix[,-4], 
+         annColors = c("#4DB3E6","#00B399","#E69900","#8B1A4F"), 
+         color = colorRampPalette(colors =  c("#030189","white","#FD0000"))(50),
+         breaks = seq(-1,1,length.out = 51))
+
+
+```
+
+```{r,message=FALSE, eval=FALSE,echo=FALSE}
+order <- labels(as.dendrogram(hclust(dist(data.matrix(estimates)))))
+#Order
+meta.sidd.o <- meta.SIDD.metabolomics[match(order,meta.SIDD.metabolomics$var),]
+meta.sird.o <- meta.SIRD.metabolomics[match(order,meta.SIRD.metabolomics$var),]
+meta.mod.o <- meta.MOD.metabolomics[match(order,meta.MOD.metabolomics$var),]
+meta.mard.o <- meta.MARD.metabolomics[match(order,meta.MARD.metabolomics$var),]
+meta.mardh.o <- meta.MARDH.metabolomics[match(order,meta.MARDH.metabolomics$var),]
+
+#New df
+pd <- data.frame(
+            seg.name = "Metabolites",
+            seg.Start = seq(1,length(order)*3, by=3),
+            seg.End = seq(3,length(order)*3, by=3),
+            Name = order,
+            Description = order)
+
+segv <- data.frame(
+            seg.name = "Metabolites",
+            seg.po = seq(2,length(order)*3, by=3),
+            Gene = order,
+            SIDD = meta.sidd.o$Effect.random * -1,
+            SIRD = meta.sird.o$Effect.random * -1,
+            MOD = meta.mod.o$Effect.random * -1,
+            MARD = meta.mard.o$Effect.random * -1,
+            MARDH = meta.mardh.o$Effect.random * -1
+)
+
+options(stringsAsFactors = F)
+# load the OmicCircos-package
+db<-segAnglePo(pd,seg=unique(pd$seg.name));
+
+list.in <- table(pd$seg.name)
+
+
+degree = (360-20)/17
+
+getDegree <- function(i, list.in, degree){
+  if(i==1 )
+  {
+   start <- 1 
+  }else{
+   start <- cumsum(list.in)[i-1]*degree+(i-1)*2
+  }
+  end <- cumsum(list.in)[i]*degree+(i-1)*2
+  data.frame(name = names(list.in)[i], i, start, end)
+}
+degrees <- getDegree(1, list.in, degree=degree)
+
+db[,2] <- degrees$start + 270
+db[,3] <- degrees$end  + 270
+
+pdf("./002.Clusters.Combine/Heatmap plot Metabolites.pdf", width=7, height=6.75)
+par(mar=c(2,2,2,2));
+plot(c(1,800),c(1,800),type="n",axes=FALSE,xlab="",ylab="",main="");
+circos2(R=250,cir=db,W=150,mapping=segv,col.v=4,type="heatmap2",lwd=1, B=F, col.bar=T, col.bar.po="bottomleft", viridis = FALSE)
+circos2(R=410,cir=db,W=20,mapping=segv,type="label2",side="out",cex=1, col="black")
+dev.off()
+```
+
