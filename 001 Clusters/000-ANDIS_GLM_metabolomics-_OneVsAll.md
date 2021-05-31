@@ -1,0 +1,41 @@
+    library(datashieldclient)
+    library(dsCDISCclient)
+    library(survminer)
+    library(survival)
+    library(dsModellingClient)
+
+    source("./000.Final_Scripts/003.Utils/Utils_GB.R")
+    source("./000.Final_Scripts/003.Utils/Utils_CoxModels.R")
+    loginpath <- "logindata_template.txt"
+    cohort <- "andis"
+    datasource <- "opal"
+    logIn(datasource, loginpath, cohort)
+
+    myAttributes <- c("METABOLOMICS","CLUSTER")
+    myTransform <-c(3,0)
+
+    datashield.assign(opal[1], "lb", "rhapsody.LB")
+    ds.dim( "lb", datasources  = opal[1])
+    ds2.subset(symbol = "lb", what = "lb", row.filter='-which(lb$LBRUNID == "Run2")')
+    ds.dim( "lb", datasources  = opal[1])
+
+    prepareData(assign="ModelData",opal=opal,attributes=myAttributes,transformVector=myTransform)
+
+# Run models
+
+    metabolites <- ds.colnames('ModelData')$andis
+    metabolites <- metabolites[which(metabolites == "LBTESTCD.AADA"):which(metabolites == "LBTESTCD.Tyr")]
+
+    # SIDD comparisons
+    ANDIS.metabolomics.results.SIDD  <- getModelForClusters(metabolites, compCluster=2, refCluster="3,4,5,6")
+    ANDIS.metabolomics.results.SIRD  <- getModelForClusters(metabolites, compCluster=3, refCluster="2,4,5,6")
+    ANDIS.metabolomics.results.MOD  <- getModelForClusters(metabolites, compCluster=4, refCluster="2,3,5,6")
+    ANDIS.metabolomics.results.MARD  <- getModelForClusters(metabolites, compCluster=5, refCluster="2,3,4,6")
+    ANDIS.metabolomics.results.MARDH  <- getModelForClusters(metabolites, compCluster=6, refCluster="2,3,4,5")
+
+    save(ANDIS.metabolomics.results.SIDD, 
+         ANDIS.metabolomics.results.SIRD, 
+         ANDIS.metabolomics.results.MOD, 
+         ANDIS.metabolomics.results.MARD, 
+         ANDIS.metabolomics.results.MARDH, 
+         file="./000.Final_Scripts/002.Clusters.Data/Metabolites GLM_models across clusters_FDB_ANDIS_OneVsAll.RData")

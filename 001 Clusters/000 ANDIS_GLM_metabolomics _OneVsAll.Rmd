@@ -2,16 +2,14 @@
 title: "GLM model metabolomics andis"
 author: "Gerard Bouland / Roderick Slieker"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
-output: html_document
+output: md_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_knit$set(root.dir = "/Users/roderick/Documents/Projecten en papers/Rhapsody_FDB/")
-setwd("/mnt/d/001_Projects/001_RHAPSODY")
-#knitr::opts_knit$set(root.dir = "/exports/molepi/users/gbouland/")
+knitr::opts_knit$set(root.dir = "D:/001_Projects/001_RHAPSODY/")
 ```
 
-```{r packs, message=FALSE, eval=TRUE}
+```{r packs, message=FALSE, eval=FALSE}
 library(datashieldclient)
 library(dsCDISCclient)
 library(survminer)
@@ -19,7 +17,7 @@ library(survival)
 library(dsModellingClient)
 ```
 
-```{r login, message=F}
+```{r login, message=F, eval=F}
 source("./000.Final_Scripts/003.Utils/Utils_GB.R")
 source("./000.Final_Scripts/003.Utils/Utils_CoxModels.R")
 loginpath <- "logindata_template.txt"
@@ -28,7 +26,7 @@ datasource <- "opal"
 logIn(datasource, loginpath, cohort)
 ```
 
-```{r load}
+```{r load, eval=F}
 myAttributes <- c("METABOLOMICS","CLUSTER")
 myTransform <-c(3,0)
 
@@ -42,7 +40,7 @@ prepareData(assign="ModelData",opal=opal,attributes=myAttributes,transformVector
 
 # Run models
 
-```{r linreg, message=FALSE, results='hide'}
+```{r linreg, message=FALSE, results='hide', eval=F}
 metabolites <- ds.colnames('ModelData')$andis
 metabolites <- metabolites[which(metabolites == "LBTESTCD.AADA"):which(metabolites == "LBTESTCD.Tyr")]
 
@@ -61,41 +59,6 @@ save(ANDIS.metabolomics.results.SIDD,
      file="./000.Final_Scripts/002.Clusters.Data/Metabolites GLM_models across clusters_FDB_ANDIS_OneVsAll.RData")
 ```
 
-### SIDD
-
-```{r}
-ANDIS.metabolomics.results.SIDD[ANDIS.metabolomics.results.SIDD$p.adj <= 0.05,]
-table(ANDIS.metabolomics.results.SIDD$p.adj <= 0.05)
-```
-
-### SIRD 
-
-```{r}
-ANDIS.metabolomics.results.SIRD[ANDIS.metabolomics.results.SIRD$p.adj <= 0.05,]
-table(ANDIS.metabolomics.results.SIRD$p.adj <= 0.05)
-```
-
-### MOD
-
-```{r}
-ANDIS.metabolomics.results.MOD[ANDIS.metabolomics.results.MOD$p.adj <= 0.05,]
-table(ANDIS.metabolomics.results.MOD$p.adj <= 0.05)
-``` 
-
-### MARD
-
-```{r}
-ANDIS.metabolomics.results.MARD[ANDIS.metabolomics.results.MARD$p.value <= 0.05,]
-table(ANDIS.metabolomics.results.MARD$p.adj <= 0.05)
-```
-
-### MARDH
-
-```{r}
-ANDIS.metabolomics.results.MARDH[ANDIS.metabolomics.results.MARDH$p.value <= 0.05,]
-table(ANDIS.metabolomics.results.MARDH$p.adj <= 0.05)
-```
-
-```{r logout, echo=F}
+```{r logout, echo=F, eval=F}
 logOut(datasource)
 ```

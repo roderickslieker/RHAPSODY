@@ -7,8 +7,7 @@
     library(reshape2)
     library(viridis)
 
-    setwd("/mnt/d/001_Projects/001_RHAPSODY/")
-    .libPaths("/mnt/d/000_Packages/Linux")
+    setwd("D:/001_Projects/001_RHAPSODY/")
 
 ## Login
 

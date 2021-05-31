@@ -15,7 +15,7 @@ library(survival)
 library(reshape2)
 library(viridis)
 
-knitr::opts_knit$set(root.dir = "/Users/roderick/Documents/Projecten en papers/Rhapsody_FDB/")
+knitr::opts_knit$set(root.dir = "D:/001_Projects/001_RHAPSODY/")
 ```
 
 
