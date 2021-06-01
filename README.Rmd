@@ -54,7 +54,7 @@ Adjusted
 
 #### Meta-analysis
 
-[Lipidomics unadjusted](https://github.com/roderickslieker/RHAPSODY/blob/master/001%20Clusters/001%20Combine_Lipidomics_GLM_Clusters.md)
+[Lipidomics unadjusted](https://github.com/roderickslieker/RHAPSODY/blob/master/001%20Clusters/001_Combine_Lipidomics_GLM_Clusters.md)
 
 [Lipidomics adjusted](https://github.com/roderickslieker/RHAPSODY/blob/master/001%20Clusters/001_Combine_Lipidomics_GLM_Clusters_Adjusted.md)
 
