@@ -1,5 +1,10 @@
 ## Clusters
 
+Analyses were performed on individual federated nodes. Hereafter,
+results were meta-analysed. Scripts are organized as such: first for
+each molecular outcome and cohort the individual analyses and next the
+meta-analysis.
+
 ### 1.Metabolomics
 
 Unadjusted
@@ -85,7 +90,12 @@ adjusted](https://github.com/roderickslieker/RHAPSODY/blob/master/001%20Clusters
 #### Meta-analysis
 
 [Proteomics
-unadjusted](https://github.com/roderickslieker/RHAPSODY/blob/master/001%20Clusters/001%20Combine_Lipidomics_GLM_Clusters.md)
+unadjusted](https://github.com/roderickslieker/RHAPSODY/blob/master/001%20Clusters/001.Combine_peptidomics_data_OneVsAll.md)
 
 [Proteomics
 adjusted](https://github.com/roderickslieker/RHAPSODY/blob/master/001%20Clusters/001_Combine_Proteomics_GLM_Clusters_Adjusted.md)
+
+## Combine Genetic risk scores
+
+[GRSs
+meta-analysis](https://github.com/roderickslieker/RHAPSODY/blob/master/001%20Clusters/002-Combine_GRS_Cohorts.md)
