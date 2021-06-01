@@ -1,0 +1,679 @@
+---
+title: "Combine GLM Lipidomics Clusters"
+author: "Gerard Bouland / Roderick Slieker"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: md_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_knit$set(root.dir = "D:/001_Projects/001_RHAPSODY/")
+```
+
+```{r, eval=F}
+library(meta)
+library(reshape2)
+library(ggplot2)
+library(tidyverse)
+source("./003.Utils/forestplot.R")
+
+load("./002.Clusters.Data/Lipids GLM_models across clusters_FDB_ANDIS_OneVsAll.RData")
+load("./002.Clusters.Data/Lipids GLM_models across clusters_FDB_DCS_OneVsAll.RData")
+load("./002.Clusters.Data/Lipids GLM_models across clusters_FDB_GoDARTS_OneVsAll.RData")
+```
+
+```{r PlotFunction, echo=FALSE, eval=F}
+cols <- c("#132B41","#009AC6","#E1B70A","#B81E3D","#878786")
+
+get.plot <- function(dataDCS, dataGODARTS, title, cohortLabels, ymin, ymax, xmin, xmax, cols)
+{
+  pd <- data.frame(Beta.DCS = dataDCS$Estimate, Beta.GoDARTS = dataGODARTS$Estimate)
+  pd$Sign <- ifelse(dataDCS$p.adj <= 0.05 & dataGODARTS$p.adj <= 0.05, "Sign", "NonSign")
+  pd$class <- cols
+  
+  
+  
+  pd$label <- ifelse(pd$Sign == "Sign", NA, NA)
+  
+  minx <- round(min(c(pd$Beta.DCS, pd$Beta.GoDARTS)), 1)
+  maxx <- round(max(c(pd$Beta.DCS, pd$Beta.GoDARTS)), 1)
+
+  P <- ggplot(pd, aes(x=Beta.DCS, y=Beta.GoDARTS, label=label, col=class))+
+    geom_point()+
+    geom_text()+
+    scale_colour_manual(values = viridis::viridis_pal()(9))+
+    xlab(paste("Estimate",cohortLabels[1]))+
+    ylab(paste("Estimate",cohortLabels[2]))+
+    ggtitle(title)+
+    geom_smooth(method=lm, col='black')+
+    geom_vline(xintercept = 0)+
+    geom_hline(yintercept = 0)+
+    xlim(xmin, xmax)+ylim(ymin, ymax)
+
+  return(P)
+}
+```
+
+
+
+```{r, echo=FALSE, eval=F}
+options(stringsAsFactors = FALSE)
+#Load mean DCS
+load("./000.Mean.Levels.Data/DCS_Lipidomics_Mean_Levels.RData")
+#Load mean GoDARTS
+load("./000.Mean.Levels.Data/GoDARTS_Lipidomics_Mean_Levels.RData")
+#Load mean Andis
+load("./000.Mean.Levels.Data/Andis_Lipidomics_Mean_Levels.RData")
+
+DCS_Lipidomics_Mean_Levels$lip <- gsub("LBTESTCD.","",DCS_Lipidomics_Mean_Levels$lip)
+GoDARTS_Lipidomics_Mean_Levels$lip <- gsub("LBTESTCD.","",GoDARTS_Lipidomics_Mean_Levels$lip)
+Andis_Lipidomics_Mean_Levels$lip <- gsub("LBTESTCD.","",Andis_Lipidomics_Mean_Levels$lip)
+DCS_Melt <- melt(DCS_Lipidomics_Mean_Levels, id.vars = c("Mean","lip","cluster", "cohort"))
+GoDARTS_Melt<- melt(GoDARTS_Lipidomics_Mean_Levels, id.vars = c("Mean","lip","cluster", "cohort"))
+Andis_Melt <- melt(Andis_Lipidomics_Mean_Levels, id.vars =c("Mean","lip","cluster", "cohort"))
+
+```
+
+```{r,echo=FALSE, eval=F}
+lipids.classes <- read.table("../002.Data/SwissLipids.csv", sep=",", header=T)
+```
+
+
+```{r, echo=FALSE, eval=F}
+cols <- c("#132B41","#009AC6","#E1B70A","#B81E3D","#878786")
+
+getPlot <- function(cohorts, var, title=NULL, breaks=NULL){
+  dataframes <- lapply(cohorts,function(co){get(co)[get(co)$lip == var,]})
+  pd <- do.call(rbind,dataframes)
+  pdx <- pd[pd$variable %in% c("25%","75%","50%"),]
+  pdx.t <- pdx[pdx$variable %in% "25%",]
+  pdx.t <- pdx.t[,-(c(ncol(pdx.t)-1):ncol(pdx.t))]
+  pdx.t$v25 <- pdx[pdx$variable %in% "25%","value"]
+  pdx.t$v50 <- pdx[pdx$variable %in% "50%","value"]
+  pdx.t$v75 <- pdx[pdx$variable %in% "75%","value"]
+  
+  conv <- data.frame(id = 2:6,
+                     name = c("SIDD","SIRD","MOD","MD","MDH"))
+  pdx.t$Cluster <- factor(conv[match(pdx.t$cluster, conv$id),"name"], levels=c("SIDD","SIRD","MOD","MD","MDH"))
+  pdx.t$cohort <- factor(pdx.t$cohort, levels=c("dcs","godarts","andis"))
+  pdx.t$cohort2 <- toupper(substr(pdx.t$cohort, 1, 1))
+  
+  p1 <- ggplot(pdx.t, aes(x=factor(Cluster), y=v50))+
+    geom_point(size=2, position=position_dodge2(width=  0.4), aes(col=Cluster, group=cohort))+
+    geom_errorbar(aes(x=Cluster, ymin=v25, ymax=v75, col=Cluster, group=cohort), width=0, position=position_dodge(width = 0.4))+
+    scale_y_continuous(trans="log10")+#, limits = c(min(pdx.t$v25)/1.5,max(pdx.t$v75)*1.5))+
+    scale_colour_manual(values = cols)+
+    #geom_text(aes(x=Cluster, y=v75*1.04, label=cohort2), position=position_dodge2(width=0.4))+
+    ylab("Levels")+
+    xlab("Cluster")+
+    facet_wrap(~cohort, scale="free_y")+
+    theme(legend.position = "none")
+  
+  if(!is.null(title))
+  {
+    p1 <- p1+ggtitle(title)
+  }
+  if(!is.null(breaks))
+  {
+    p1 <- p1+scale_y_continuous(trans="log10",breaks=breaks)
+  }
+  
+  pdf(sprintf("../003.Figures.combined/Plot_of_%s.pdf", var), width=6, height=3)
+  print(p1)
+  dev.off()
+  return(p1)
+}
+
+
+```
+
+```{r GLMCombine, echo=FALSE, eval=F}
+CombineGLM <- function(Data01, Data02, Data03, ColVar, studyLabels){
+  #Check if dataframes have equal number of rows
+  if(!nrow(Data01) == nrow(Data02)){
+    stop("Dataframes are not of equal length")
+  }
+  #Check if variables are equal and in same order
+  if(!table(as.character(Data01[,ColVar]) == as.character(Data02[,ColVar]))==nrow(Data01)){
+    stop("Variables of dataframes are not in same order")
+  }
+  if(!table(as.character(Data01[,ColVar]) == as.character(Data03[,ColVar]))==nrow(Data01)){
+    stop("Variables of dataframes are not in same order")
+  }
+  
+  combined <- data.frame()
+  variables <-as.character(Data01[,ColVar])
+  
+  for(i in seq_along(variables)){
+    var <- variables[i]
+    tmp.merge <- rbind(Data01[Data01[,ColVar] == var,],
+                       Data02[Data02[,ColVar] == var,],
+                       Data03[Data03[,ColVar] == var,])
+    
+
+    tmp.combined <- metagen(TE = tmp.merge$Estimate, seTE = tmp.merge$Std..Error, studlab = studyLabels, comb.fixed = TRUE, comb.random = TRUE)
+    cis <- ci(TE = tmp.combined$TE.random, seTE = tmp.combined$seTE.random, level=0.95, df=NULL, null.effect = 0)
+    summ <- data.frame(var,
+                      Effect.random = tmp.combined$TE.random,
+                      lower = cis$lower,
+                      upper = cis$upper,
+                      Zval.random = tmp.combined$zval.random,
+                      Pval.random  = tmp.combined$pval.random,
+                      I2 = summary(tmp.combined)$I2$TE,
+                      Het = pchisq(tmp.combined$Q,1, lower.tail=F))
+    
+    combined <- rbind(combined,summ)
+  }
+  combined <- combined[order(combined$Pval.random, decreasing=F),]
+  combined$fdr.random <- p.adjust(combined$Pval.random,method="fdr")
+  return(combined)
+}
+```
+
+```{r, eval=F}
+updateData <- function(data,varNames){
+  data <- data[match(varNames, data$var),]
+  data$p.adj <- p.adjust(data$p.value,'fdr')
+  return(data)
+}
+```
+
+```{r, eval=F}
+tmp <- c(as.character(ANDIS.lipidomics.results.SIDD$var),
+         as.character(DCS.lipidomics.results.SIDD$var),
+         as.character(GoDARTS.lipidomics.results.SIDD$var))
+lipids <- names(table(tmp)[table(tmp) == 3])
+
+lipids.classes.Model_1 <- lipids.classes[match(lipids,lipids.classes$FDBName),]
+
+#Update DCS
+results.SIDD.DCS  <- updateData(DCS.lipidomics.results.SIDD,lipids)
+results.SIRD.DCS  <- updateData(DCS.lipidomics.results.SIRD,lipids)
+results.MOD.DCS   <- updateData(DCS.lipidomics.results.MOD,lipids)
+results.MARD.DCS  <- updateData(DCS.lipidomics.results.MARD,lipids)
+results.MARDH.DCS <- updateData(DCS.lipidomics.results.MARDH,lipids)
+
+#Update GoDARTS
+results.SIDD.GoDARTS  <- updateData(GoDARTS.lipidomics.results.SIDD,lipids)
+results.SIRD.GoDARTS  <- updateData(GoDARTS.lipidomics.results.SIRD,lipids)
+results.MOD.GoDARTS   <- updateData(GoDARTS.lipidomics.results.MOD,lipids)
+results.MARD.GoDARTS  <- updateData(GoDARTS.lipidomics.results.MARD,lipids)
+results.MARDH.GoDARTS <- updateData(GoDARTS.lipidomics.results.MARDH,lipids)
+
+#Update Andis
+results.SIDD.ANDIS  <- updateData(ANDIS.lipidomics.results.SIDD,lipids)
+results.SIRD.ANDIS  <- updateData(ANDIS.lipidomics.results.SIRD,lipids)
+results.MOD.ANDIS   <- updateData(ANDIS.lipidomics.results.MOD,lipids)
+results.MARD.ANDIS  <- updateData(ANDIS.lipidomics.results.MARD,lipids)
+results.MARDH.ANDIS <- updateData(ANDIS.lipidomics.results.MARDH,lipids)
+```
+
+
+
+```{r, eval=F}
+head(results.SIDD.DCS)
+head(results.SIDD.GoDARTS)
+
+
+pd <- data.frame(Cluster = factor(rep(c("SIDD","SIRD","MOD","MD","MDH"), each=nrow(results.SIDD.DCS)), levels=c("SIDD","SIRD","MOD","MD","MDH")), 
+                 DCS = c(results.SIDD.DCS$Estimate, results.SIRD.DCS$Estimate, results.MOD.DCS$Estimate, results.MARD.DCS$Estimate, results.MARDH.DCS$Estimate),
+                 GoDARTS = c(results.SIDD.GoDARTS$Estimate, results.SIRD.GoDARTS$Estimate, results.MOD.GoDARTS$Estimate, results.MARD.GoDARTS$Estimate, results.MARDH.GoDARTS$Estimate),
+                 ANDIS = c(results.SIDD.ANDIS$Estimate, results.SIRD.ANDIS$Estimate, results.MOD.ANDIS$Estimate, results.MARD.ANDIS$Estimate, results.MARDH.ANDIS$Estimate))
+                 
+a1 <- rbind(
+  ggplotGrob(
+    ggplot(pd, aes(x=DCS, y=GoDARTS))+
+    geom_point()+
+    facet_grid(~Cluster)+
+    geom_vline(xintercept = 0)+
+    geom_hline(yintercept = 0)+
+    geom_smooth(method=lm)
+  ),ggplotGrob(
+    ggplot(pd, aes(x=DCS, y=ANDIS))+
+    geom_point()+
+    facet_grid(~Cluster)+
+    geom_vline(xintercept = 0)+
+    geom_hline(yintercept = 0)+
+    geom_smooth(method=lm)
+  ),ggplotGrob(
+    ggplot(pd, aes(x=GoDARTS, y=ANDIS))+
+    geom_point()+
+    facet_grid(~Cluster)+
+    geom_vline(xintercept = 0)+
+    geom_hline(yintercept = 0)+
+    geom_smooth(method=lm)
+), size="first")
+
+pdf("Comparison of effect size_lipidomics.pdf", width=10, height=10)
+plot(a1)
+dev.off()
+```
+
+## Combine
+
+```{r, eval=F}
+meta.SIDD.lipidomics <- CombineGLM(results.SIDD.DCS,results.SIDD.GoDARTS,results.SIDD.ANDIS,ColVar = "var",studyLabels = c("dcs","godarts","andis"))
+meta.SIRD.lipidomics <- CombineGLM(results.SIRD.DCS,results.SIRD.GoDARTS,results.SIRD.ANDIS,ColVar = "var",studyLabels = c("dcs","godarts","andis"))
+meta.MOD.lipidomics <- CombineGLM(results.MOD.DCS,results.MOD.GoDARTS,results.MOD.ANDIS,ColVar = "var",studyLabels = c("dcs","godarts","andis"))
+meta.MARD.lipidomics <- CombineGLM(results.MARD.DCS,results.MARD.GoDARTS,results.MARD.ANDIS,ColVar = "var",studyLabels = c("dcs","godarts","andis"))
+meta.MARDH.lipidomics <- CombineGLM(results.MARDH.DCS,results.MARDH.GoDARTS,results.MARDH.ANDIS,ColVar = "var",studyLabels = c("dcs","godarts","andis"))
+```
+
+## SIDD
+
+```{r,out.width=900, eval=F}
+knitr::kable(meta.SIDD.lipidomics[meta.SIDD.lipidomics$fdr.random < 0.05,])
+table(meta.SIDD.lipidomics$fdr.random <= 0.05)
+table(meta.SIDD.lipidomics[meta.SIDD.lipidomics$Effect.random < 0,]$fdr.random <= 0.05)
+
+getPlot(cohorts = c("DCS_Melt","GoDARTS_Melt","Andis_Melt"),var = "SM.34.2.2", title = "SM.34.2.2")
+	
+#print(getPlot(c("DCS_Melt","GoDARTS_Melt","Andis_Melt"),"PC.O.16.1.0.18.1.0"))
+
+#knitr::include_graphics(path = 'Z:/Roderick/001 Projects/Rhapsody/001.1 Federated analyses/002.Clusters.Combine/SM_34_2_2_SIDD_forest.png')
+knitr::kable(meta.SIRD.lipidomics[meta.SIRD.lipidomics$fdr.random < 0.05,])
+get.plot(results.SIDD.DCS,results.SIDD.GoDARTS,"Estimates SIDD",c("DCS","GoDARTS"),-1,1,-1,1,col=lipids.classes.Model_1$Class)
+get.plot(results.SIDD.DCS,results.SIDD.ANDIS,"Estimates SIDD",c("DCS","ANDIS"),-1,1,-1,1,col=lipids.classes.Model_1$Class)
+get.plot(results.SIDD.GoDARTS,results.SIDD.ANDIS,"Estimates SIDD",c("GoDARTS","ANDIS"),-1,1,-1,1,col=lipids.classes.Model_1$Class)
+```
+
+## SIRD
+
+```{r,out.width=900, eval=F}
+table(meta.SIRD.lipidomics$fdr.random < 0.05)
+table(meta.SIRD.lipidomics[meta.SIRD.lipidomics$Effect.random < 0,]$fdr.random <= 0.05)
+
+getPlot(c("DCS_Melt","GoDARTS_Melt","Andis_Melt"),"PC.O.16.1.0.18.1.0")
+getPlot(c("DCS_Melt","GoDARTS_Melt","Andis_Melt"),"PC.O.16.1.0.18.2.0")
+getPlot(c("DCS_Melt","GoDARTS_Melt","Andis_Melt"),"PC.O.16.1.0.18.1.0")
+
+getPlot(cohorts = c("DCS_Melt","GoDARTS_Melt","Andis_Melt"), breaks = seq(1,2,by=0.2), var = "PC.O.16.0.0.18.1.0", title = "PC O-16:0;0/18:1;0")
+
+getPlot(cohorts = c("DCS_Melt","GoDARTS_Melt","Andis_Melt"),  var = "TAG.51.3.0", title = "TAG 51:3;0")
+
+getPlot(cohorts = c("DCS_Melt","GoDARTS_Melt","Andis_Melt"),  var = "CE.16.1.0", title = "CE.16.1.0")
+
+
+
+
+
+get.plot(results.SIRD.DCS,resualts.SIRD.ANDIS,"Estimates SIRD",c("DCS","ANDIS"),-1,1,-1,1,col=lipids.classes.Model_1$Class)
+get.plot(results.SIRD.GoDARTS,results.SIRD.ANDIS,"Estimates SIRD",c("GoDARTS","ANDIS"),-1,1,-1,1,col=lipids.classes.Model_1$Class)
+```
+
+## MOD
+
+```{r,out.width=900, eval=F}
+knitr::kable(meta.MOD.lipidomics[meta.MOD.lipidomics$fdr.random < 0.05,])
+table(meta.MOD.lipidomics$fdr.random < 0.05)
+table(meta.MOD.lipidomics[meta.MOD.lipidomics$Effect.random < 0,]$fdr.random <= 0.05)
+
+getPlot(cohorts = c("DCS_Melt","GoDARTS_Melt","Andis_Melt"),var = "TAG.52.4.0", title = "TAG.52.4.0")
+getPlot(cohorts = c("DCS_Melt","GoDARTS_Melt","Andis_Melt"),var = "TAG.51.3.0", title = "TAG.51.3.0")
+
+getPlot(c("DCS_Melt","GoDARTS_Melt","Andis_Melt"),"TAG.52.4.0")
+get.plot(results.MOD.DCS,results.MOD.GoDARTS,"Estimates MOD",c("DCS","GoDARTS"),-1,1,-1,1,col=lipids.classes.Model_1$Class)
+get.plot(results.MOD.DCS,results.MOD.ANDIS,"Estimates MOD",c("DCS","ANDIS"),-1,1,-1,1,col=lipids.classes.Model_1$Class)
+get.plot(results.MOD.GoDARTS,results.MOD.ANDIS,"Estimates MOD",c("GoDARTS","ANDIS"),-1,1,-1,1,col=lipids.classes.Model_1$Class)
+```
+
+## MARD
+
+```{r,out.width=900, eval=F}
+knitr::kable(meta.MARD.lipidomics[meta.MARD.lipidomics$fdr.random < 0.05,])
+table(meta.MARD.lipidomics$fdr.random < 0.05)
+
+get.plot(results.MARD.DCS,results.MARD.GoDARTS,"Estimates MARD",c("DCS","GoDARTS"),-1,1,-1,1,col=lipids.classes.Model_1$Class)
+get.plot(results.MARD.DCS,results.MARD.ANDIS,"Estimates MARD",c("DCS","ANDIS"),-1,1,-1,1,col=lipids.classes.Model_1$Class)
+get.plot(results.MARD.GoDARTS,results.MARD.ANDIS,"Estimates MARD",c("GoDARTS","ANDIS"),-1,1,-1,1,col=lipids.classes.Model_1$Class)
+```
+
+##MARDH
+
+```{r,out.width=900, eval=F}
+knitr::kable(meta.MARDH.lipidomics[meta.MARDH.lipidomics$fdr.random < 0.05,])
+meta.MARDH.lipidomics.sign <- meta.MARDH.lipidomics[meta.MARDH.lipidomics$fdr.random <= 0.05,]
+table(meta.MARDH.lipidomics.sign$fdr.random < 0.05)
+table(meta.MARDH.lipidomics.sign$Effect.random*-1 <= 0.05)
+
+getPlot(c("DCS_Melt","GoDARTS_Melt","Andis_Melt"),"TAG.51.1.0")
+getPlot(c("DCS_Melt","GoDARTS_Melt","Andis_Melt"),"PC.O.16.1.0.18.1.0")
+
+get.plot(results.MARDH.DCS,results.MARDH.GoDARTS,"Estimates MARDH",c("DCS","GoDARTS"),-1,1,-1,1,col=lipids.classes.Model_1$Class)
+get.plot(results.MARDH.DCS,results.MARDH.ANDIS,"Estimates MARDH",c("DCS","ANDIS"),-1,1,-1,1,col=lipids.classes.Model_1$Class)
+get.plot(results.MARDH.GoDARTS,results.MARDH.ANDIS,"Estimates MARDH",c("GoDARTS","ANDIS"),-1,1,-1,1,col=lipids.classes.Model_1$Class)
+```
+
+```{r,eval=TRUE,echo=FALSE, eval=F}
+save(meta.SIDD.lipidomics,file="./002.Clusters.Combine/Lipidomics_Clusters_Meta_SIDD.RData")
+save(meta.SIRD.lipidomics,file="./002.Clusters.Combine/Lipidomics_Clusters_Meta_SIRD.RData")
+save(meta.MOD.lipidomics,file="./002.Clusters.Combine/Lipidomics_Clusters_Meta_MOD.RData")
+save(meta.MARD.lipidomics,file="./002.Clusters.Combine/Lipidomics_Clusters_Meta_MARD.RData")
+save(meta.MARDH.lipidomics,file="./002.Clusters.Combine/Lipidomics_Clusters_Meta_MARDH.RData")
+
+rio::export(meta.SIDD.lipidomics, file="./002.Clusters.Combine/Lipidomics_Clusters_Meta_SIDD.xlsx")
+rio::export(meta.SIRD.lipidomics, file="./002.Clusters.Combine/Lipidomics_Clusters_Meta_SIRD.xlsx")
+rio::export(meta.MOD.lipidomics, file="./002.Clusters.Combine/Lipidomics_Clusters_Meta_MOD.xlsx")
+rio::export(meta.MARD.lipidomics, file="./002.Clusters.Combine/Lipidomics_Clusters_Meta_MARD.xlsx")
+rio::export(meta.MARDH.lipidomics, file="./002.Clusters.Combine/Lipidomics_Clusters_Meta_MARDH.xlsx")
+
+```
+
+
+# Circos
+
+```{r,message=FALSE, eval=FALSE,echo=TRUE}
+library(OmicCircos)
+lipids.classes <- read.table("../002.Data/SwissLipids.csv", sep=",", header=T)
+lipids.classes <- lipids.classes[lipids.classes$FDBName %in% lipids,]
+
+meta.SIDD.lipidomics.o <- meta.SIDD.lipidomics[match(lipids.classes$FDBName,meta.SIDD.lipidomics$var),]
+meta.SIRD.lipidomics.o <- meta.SIRD.lipidomics[match(lipids.classes$FDBName,meta.SIRD.lipidomics$var),]
+meta.MOD.lipidomics.o <- meta.MOD.lipidomics[match(lipids.classes$FDBName,meta.MOD.lipidomics$var),]
+meta.MARD.lipidomics.o <- meta.MARD.lipidomics[match(lipids.classes$FDBName,meta.MARD.lipidomics$var),]
+meta.MARDH.lipidomics.o <- meta.MARDH.lipidomics[match(lipids.classes$FDBName,meta.MARDH.lipidomics$var),]
+
+#New df
+pd <- data.frame(
+            seg.name = lipids.classes$Class,
+            seg.Start = seq(1,nrow(lipids.classes) * 3, by=3),
+            seg.End = seq(3,nrow(lipids.classes) * 3, by=3),
+            Name = lipids.classes$Class,
+            Description = lipids.classes$Class)
+
+
+segv <- data.frame(
+            seg.name = lipids.classes$Class,
+            seg.po = seq(2,nrow(lipids.classes)*3, by=3),
+            Gene = meta.SIDD.lipidomics.o$var,
+            SIDD = meta.SIDD.lipidomics.o$Effect.random * -1,
+            SIRD = meta.SIRD.lipidomics.o$Effect.random * -1,
+            MOD = meta.MOD.lipidomics.o$Effect.random * -1,
+            MARD = meta.MARD.lipidomics.o$Effect.random * -1,
+            MARDH = meta.MARDH.lipidomics.o$Effect.random * -1
+)
+
+head(segv)
+
+
+
+source("./003.Utils/OmicCircos.R")
+
+options(stringsAsFactors = F)
+# load the OmicCircos-package
+db<-segAnglePo(pd,seg=unique(pd$seg.name));
+
+list.in <- table(pd$seg.name)
+list.in <- list.in[db[,1]]
+getDegree <- function(i, list.in){
+  if(i==1 )
+  {
+   start <- 1 
+  }else{
+   start <- cumsum(list.in)[i-1]*2.011696+(i-1)*2
+  }
+  end <- cumsum(list.in)[i]*2.011696+(i-1)*2.011696
+  data.frame(name = names(list.in)[i], i, start, end)
+}
+degrees <- do.call(rbind, lapply(1:9, getDegree, list.in))
+degrees <- degrees[match(db[,1],degrees$name),]
+db[,2] <- degrees$start + 270
+db[,3] <- degrees$end + 270
+
+pdf("./002.Clusters.Combine/Heatmap plot lipids.pdf", width=7, height=6.75)
+par(mar=c(2,2,2,2));
+plot(c(1,800),c(1,800),type="n",axes=FALSE,xlab="",ylab="",main="");
+circos2(R=400,type="chr",cir=db,print.chr.lab=TRUE,W=4,scale=FALSE,col=viridis::viridis_pal()(9));
+circos2(R=250,cir=db,W=150,mapping=segv,col.v=4,type="heatmap2",lwd=1, B=F, col.bar=T, col.bar.po="bottomright", col=viridis::viridis_pal()(4))
+circos2(R=410,cir=db,W=20,mapping=segv,type="label",side="out",cex=0.4, col="black")
+dev.off()
+```
+
+# Enrichments
+
+```{r, eval=TRUE, echo=F, eval=F}
+makeMetaSignMatrix <- function(Data1,Data2,Data3,Data4,adjust=NULL)
+{
+ 
+  
+  if(!is.null(adjust))
+  {
+    Data1$p.adj <- p.adjust(Data1$Pval.random, method = adjust)
+    Data2$p.adj <- p.adjust(Data2$Pval.random, method = adjust)
+    Data3$p.adj <- p.adjust(Data3$Pval.random, method = adjust)
+    Data4$p.adj <- p.adjust(Data4$Pval.random, method = adjust)
+  }
+  
+  sign.matrix <- matrix(rep(0), ncol=4, nrow=nrow(Data1))
+  colnames(sign.matrix) <- c("SIDD","SIRD","MOD","MARDH")
+  rownames(sign.matrix) <- sort(Data1$var)
+  
+  Data1.sign <- Data1[Data1$p.adj <= 0.05,]
+  Data2.sign <- Data2[Data2$p.adj <= 0.05,]
+  Data3.sign <- Data3[Data3$p.adj <= 0.05,]
+  Data4.sign <- Data4[Data4$p.adj <= 0.05,]
+  
+  nrow(Data1.sign)
+  nrow(Data2.sign)
+  nrow(Data3.sign)
+  nrow(Data4.sign)
+  
+  sign.matrix[match(Data1.sign$var, rownames(sign.matrix)), "SIDD"] <- 1
+  sign.matrix[match(Data2.sign$var, rownames(sign.matrix)), "SIRD"] <- 1
+  sign.matrix[match(Data3.sign$var, rownames(sign.matrix)), "MOD"] <- 1
+  sign.matrix[match(Data4.sign$var, rownames(sign.matrix)), "MARDH"] <- 1
+  return(sign.matrix)
+}
+
+
+getTable <- function(direction, SIDD, SIRD, MOD, MARD)
+{
+  SIDD <- SIDD[SIDD$fdr.random <= 0.05,]
+  SIRD <- SIRD[SIRD$fdr.random <= 0.05,]
+  MOD <- MOD[MOD$fdr.random <= 0.05,]
+  MARD <- MARD[MARD$fdr.random <= 0.05,]
+
+  if(direction == "negative")
+  {
+    SIDD.n <- SIDD[SIDD$Effect.random >= 0 ,] #Opposite effects
+    SIRD.n <- SIRD[SIRD$Effect.random >= 0,]
+    MOD.n  <- MOD[MOD$Effect.random >= 0,]
+    MARD.n <- MARD[MARD$Effect.random >= 0,]
+
+    enrichments <- rbind(
+      getEnrichment(signData=SIDD.n, lipidClassData=lipidClass.subset, name="SIDD"),
+      getEnrichment(signData=SIRD.n, lipidClassData=lipidClass.subset, name="SIRD"),
+      getEnrichment(signData=MOD.n, lipidClassData=lipidClass.subset, name="MOD"),
+      getEnrichment(signData=MARD.n, lipidClassData=lipidClass.subset, name="MARDH"))
+    enrichments$name <- factor(enrichments$name, levels=c("SIDD","SIRD","MOD","MARDH"))
+    enrichments$direction <- direction
+  }else{
+    SIDD.p <- SIDD[SIDD$Effect.random <= 0,]
+    SIRD.p <- SIRD[SIRD$Effect.random <= 0,]
+    MOD.p  <- MOD[MOD$Effect.random <= 0,]
+    MARD.p <- MARD[MARD$Effect.random <= 0,]
+
+    enrichments <- rbind(
+      getEnrichment(signData=SIDD.p, lipidClassData=lipidClass.subset, name="SIDD"),
+      getEnrichment(signData=SIRD.p, lipidClassData=lipidClass.subset, name="SIRD"),
+      getEnrichment(signData=MOD.p, lipidClassData=lipidClass.subset, name="MOD"),
+      getEnrichment(signData=MARD.p, lipidClassData=lipidClass.subset, name="MARD"))
+    enrichments$name <- factor(enrichments$name, levels=c("SIDD","SIRD","MOD","MARD"))
+    enrichments$direction <- direction
+  }
+
+
+  enrichments$ymin <- ifelse(enrichments$OR <= 1, enrichments$CI.lower, enrichments$OR)
+  enrichments$ymax <- ifelse(enrichments$OR <= 1, enrichments$OR, enrichments$CI.upper)
+  return(enrichments)
+}
+
+
+getEnrichment <- function(signData, lipidClassData,name)
+{
+  #n00
+  nxx <- table(lipidClassData$Class)
+  lcd <- lipidClassData[match(signData$var, lipidClassData$FDBName),"Class"]
+  n11 <- table(lcd)
+  nss <- nrow(signData)
+  nxx <- nxx[match(names(n11), names(nxx))]
+  sign.table <- data.frame(class = names(n11), n11 = as.numeric(n11), n01=as.numeric(nss-n11), n10=as.numeric(nxx-n11))
+  sign.table$n00 <- nrow(lipidClassData) - sign.table$n10 - sign.table$n01 - sign.table$n11
+  sign.table$perc <- sign.table$n11 / nss
+
+  
+  check <- which(colSums(sign.table==0) > 0)
+  sign.table$flag <- 0
+
+  if(length(check) >= 1)
+  {
+    for(i in check)
+    {
+      rm <- which(sign.table[,i] == 0)
+      sign.table[rm, "flag"] <- 1
+      sign.table[,i] <- ifelse(sign.table[,i] == 0, 1, sign.table[,i])
+      
+    }
+  }
+  
+  getOR <- function(x, sign.table)
+  {
+    mt <- matrix(c(sign.table$n11[x],sign.table$n01[x],sign.table$n10[x],sign.table$n00[x]), ncol=2, byrow = T)
+    fit <- epitools::oddsratio(mt)
+    out <- data.frame(var = as.character(sign.table$class[x]), OR = fit$measure["Exposed2","estimate"], CI.lower = fit$measure["Exposed2","lower"], CI.upper = fit$measure["Exposed2","upper"], P.value = fit$p.value["Exposed2","fisher.exact"])
+    return(out)
+  }
+
+  add.OR <- do.call(rbind, lapply(1:nrow(sign.table), getOR, sign.table=sign.table))
+
+
+  return.out <- data.frame(sign.table, add.OR[,-1])
+  return.out$name <- name
+  return(return.out)
+}
+
+getTable2 <- function(cluster)
+{
+  data.in <- get(sprintf("meta.%s.lipidomics",cluster))
+
+  data.in.up <- data.in[data.in$fdr.random<=0.05 & data.in$Effect.random <=0,]
+  data.in.down <- data.in[data.in$fdr.random<=0.05 & data.in$Effect.random >=0,]
+  
+  data.in.enr <- rbind(getEnrichment(signData = data.in.up, lipidClassData=lipidClass.subset, name=paste0(cluster,".up")),
+                       getEnrichment(data.in.down, lipidClassData=lipidClass.subset, name=paste0(cluster,".down")))
+  return(data.in.enr)
+}
+```
+
+```{r, eval=F}
+lipidClass <- read.table("./002.Data/SwissLipids.csv", sep=",", header=T)
+lipidClass.subset <- lipidClass[lipidClass$FDBName %in% meta.SIDD.lipidomics$var,]
+
+
+
+pd <- data.frame(table(lipidClass.subset$Class))
+pd$Var1 <- as.character(pd$Var1) %>% factor(levels = pd$Var1[order(pd$Freq, decreasing = T)])
+
+pd$fraction = pd$Freq / sum(pd$Freq)
+pd = pd[order(pd$fraction,decreasing = T), ]
+pd$ymax = cumsum(pd$fraction)
+pd$ymin = c(0, head(pd$ymax, n=-1))
+
+pd$Var1 <- as.character(pd$Var1) %>% factor(levels = pd$Var1[order(pd$Freq, decreasing = T)])
+
+library(tidyverse)
+
+#Dataframw
+px <- ggplot(pd, aes(fill=Var1, ymax=ymax, ymin=ymin, xmax=4, xmin=3))+
+  geom_rect() +
+  coord_polar(theta="y") +
+  xlim(c(0, 4)) +
+  #theme_sniper() +
+  theme(panel.grid=element_blank(),
+        axis.title = element_blank(),
+        axis.text=element_blank(),
+        axis.ticks=element_blank(),
+        axis.line = element_blank()) +
+  geom_text(aes(label=sprintf("%s\n(N=%s,%%=%s)",pd$Var1, pd$Freq, round(pd$fraction*100,2)), x=3.5,
+                y=pd$ymax-((pd$ymax-pd$ymin)/2)),
+            col="black", check_overlap = FALSE)+
+  scale_fill_manual(values = viridis::viridis_pal()(9))
+
+pdf("Figure Sx.pdf")
+px
+dev.off()
+```
+
+
+```{r, eval=F}
+enrichments <- rbind(getTable2("SIDD"),getTable2("SIRD"),getTable2("MOD"),getTable2("MARDH"))
+#Add labels
+enrichments$label <- paste0(round(enrichments$perc*100,1),"%")
+enrichments$label <- ifelse(enrichments$label == '0%', NA, enrichments$label)
+
+enrichments$ymin <- ifelse(enrichments$OR <= 1, enrichments$CI.lower, enrichments$OR)
+enrichments$ymax <- ifelse(enrichments$OR <= 1, enrichments$OR, enrichments$CI.upper)
+
+ymax <- max(enrichments$ymax[!is.infinite(enrichments$ymax)])
+enrichments2 <- data.frame(enrichments, colsplit(enrichments$name, "\\.", LETTERS[1:2]))
+enrichments2$B  <- factor(enrichments2$B, c("down","up"))
+enrichments2$A  <- factor(enrichments2$A, c("SIDD","SIRD","MOD","MARDH"))
+
+
+p1 <- ggplot(enrichments2, aes(x=class, y=OR, fill=class, label=label))+
+  geom_col()+
+  facet_grid(B~A)+
+  scale_y_continuous(trans="log2", limits=c(0.01,ymax), breaks=c(0.01,0.25,1,100,1000))+
+  theme(axis.text.x=element_text(angle=90, hjust=1, vjust=0.5))+
+  geom_hline(yintercept = 1)+
+  ylab("Odds ratio (log2)")+
+  geom_text()+
+  geom_errorbar(aes(ymin=ymin, ymax=ymax, col=class, width=0), alpha=0.5)+
+  scale_fill_manual(values = viridis::viridis_pal()(9))+
+  scale_colour_manual(values = viridis::viridis_pal()(9))
+
+pdf("./002.Clusters.Combine//Lipids_enrichment_classes_clusters.pdf", height=6, width=10)
+print(p1)
+dev.off()
+
+rio::export(enrichments2, file="./002.Clusters.Combine/Enrichment_Lipids.xlsx")
+
+
+p2 <- ggplot(enrichments2, aes(x=class, y=perc*100, fill=class, label=label))+
+  geom_col()+
+  facet_grid(B~A)+
+  #scale_y_continuous(trans="log2", limits=c(0.01,ymax), breaks=c(0.01,0.25,1,100,1000,5000))+
+  theme(axis.text.x=element_text(angle=90, hjust=1, vjust=0.5))+
+  geom_hline(yintercept = 1)+
+  ylab("Percentage in group")+
+  geom_text(aes(y=(perc*100)+5))+
+  #geom_errorbar(aes(ymin=ymin, ymax=ymax, col=class, width=0), alpha=0.5)+
+  scale_fill_manual(values = viridis::viridis_pal()(9))+
+  scale_colour_manual(values = viridis::viridis_pal()(9))
+
+
+pdf("./002.Clusters.Combine//Lipids_percentage_classes_clusters.pdf", height=6, width=10)
+print(p2)
+dev.off()
+
+enrichments
+
+rio::export(enrichments, file="./002.Clusters.Combine/Enrichments.xlsx")
+```
+
+
+```{r, eval=F}
+head(meta.MARDH.lipidomics)
+head(meta.SIRD.lipidomics, 20)
+getPlot(cohorts = c("DCS_Melt","GoDARTS_Melt","Andis_Melt"),var = "TAG.48.0.0", title = "TAG.48.0.0")
+getPlot(cohorts = c("DCS_Melt","GoDARTS_Melt","Andis_Melt"),var = "TAG.51.3.0", title = "TAG.51.3.0")
+
+getPlot(cohorts = c("DCS_Melt","GoDARTS_Melt","Andis_Melt"),var = "PC.O.16.0.0.18.1.0", title = "PC.O.16.0.0.18.1.0", breaks=c(1.5, 2, 2.5,3,3.5))
+
+
+
+
+getPlot(cohorts = c("DCS_Melt","GoDARTS_Melt","Andis_Melt"),var = "TAG.48.0.0", title = "TAG 48:0;0")
+getPlot(cohorts = c("DCS_Melt","GoDARTS_Melt","Andis_Melt"),var = "TAG.56.5.0", title = "TAG 56:5;0")
+
+
+```
