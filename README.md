@@ -99,3 +99,13 @@ adjusted](https://github.com/roderickslieker/RHAPSODY/blob/master/001%20Clusters
 
 [GRSs
 meta-analysis](https://github.com/roderickslieker/RHAPSODY/blob/master/001%20Clusters/002-Combine_GRS_Cohorts.md)
+
+## Compare protein data with Yang et al.
+
+[Yang et
+al. comparison](https://github.com/roderickslieker/RHAPSODY/blob/master/001%20Clusters/002-Overlap_Yang.md)
+
+## Compare effect sizes TAG with acyl chain carbon and double bonds
+
+[Lipid effect sizes vs acyl
+chains](https://github.com/roderickslieker/RHAPSODY/blob/master/001%20Clusters/002-Overlap_Yang.md)

@@ -1,0 +1,133 @@
+---
+title: "Overlap with Yang et al"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_knit$set(root.dir = "D:/001_Projects/001_RHAPSODY/012. Overlap_public/")
+#setwd("D:/001_Projects/001_RHAPSODY/012. Overlap_public/")
+```
+
+## Packages
+
+```{r}
+library(magrittr)
+library(ggplot2)
+```
+
+```{r}
+load("D:/001_Projects/033_RHAPSODY_Shiny/www/Cluster_data.RData")
+meta <- rio::import("D:/001_Projects/001_RHAPSODY/002.Data/MetaData.txt")
+corr <- rio::import("Table S2.xlsx")
+hr.cvd <- rio::import("Incident_CVD.xlsx")
+hr.cvd$Protein <- gsub("\r\n","", hr.cvd$Protein)
+``` 
+
+```{r}
+pd <- protein.data[protein.data$FDR <= 0.05,]
+table(pd$Cluster)
+clusters <- c("SIDD","SIRD","MOD","MD","MDH")
+
+
+corr.data <- lapply(clusters, function(cluster, pd, meta, corr){
+  cat(cluster)
+  pdx <- pd[pd$Cluster %in% cluster,]
+  metax <- meta[match(pdx$Variable, meta$SomaId),]
+  corrx <- corr[corr$Protein %in% metax$TargetFullName,]
+  metax2 <- meta[match(corrx$Protein, meta$TargetFullName),]
+  corrx$SomaId <- metax2$SomaId
+  pdx2 <- pdx[match(corrx$SomaId, pdx$Variable),]
+  corrx$Effect <- pdx2$Effect
+  corrx$Direction <- ifelse(corrx$Effect <= 0,"Downregulated","Upregulated")
+  
+  corrx$Cluster <- cluster
+  #corrx$Direction <- direction
+  corrx
+}, pd=pd, meta=meta, corr=corr) %>% do.call(what = rbind)
+
+colnames(corr.data)[3] <- "Correlation"
+corr.data$Cluster <-factor(corr.data$Cluster, levels=clusters)
+corr.data$Target <- meta[match(corr.data$SomaId, meta$SomaId),"Target"]
+corr.data$label <- ifelse(abs(corr.data$Correlation) >= 0.6, corr.data$Target,NA)
+```
+
+```{r}
+ggplot(corr.data, aes(x=Cluster, y=Correlation, fill=Direction, label=label))+
+  geom_boxplot(alpha=0.5, width=0.5)+
+  ggbeeswarm::geom_beeswarm(alpha=0.5)+
+  geom_hline(yintercept = 0)+
+  scale_fill_manual(values = c("#009AC7","#900D09BB"))+
+  ylab("Correlation with eGFR (Spearman rho)")+
+  facet_grid(~Direction)+
+  ggrepel::geom_text_repel()
+```
+
+## Export
+
+```{r}
+pdf("Correlation data with eGFR_Yang paper.pdf", width=10, height=5)
+ggplot(corr.data, aes(x=Cluster, y=Correlation, fill=Direction, label=label))+
+  geom_boxplot(alpha=0.5, width=0.5)+
+  ggbeeswarm::geom_beeswarm(alpha=0.5)+
+  geom_hline(yintercept = 0)+
+  scale_fill_manual(values = c("#009AC7","#900D09BB"))+
+  ylab("Correlation with eGFR (Spearman rho)")+
+  facet_grid(~Direction)+
+  ggrepel::geom_text_repel()
+dev.off()
+```
+
+
+# CVD
+
+```{r}
+head(hr.cvd)
+
+
+
+cvd.data <- lapply(clusters, function(cluster, pd, meta, hr.cvd){
+  cat(cluster)
+  pdx <- pd[pd$Cluster %in% cluster,]
+  metax <- meta[match(pdx$Variable, meta$SomaId),]
+  hr.cvdx <- hr.cvd[hr.cvd$Protein %in% metax$TargetFullName,]
+  metax2 <- meta[match(hr.cvdx$Protein, meta$TargetFullName),]
+  hr.cvdx$SomaId <- metax2$SomaId
+  pdx2 <- pdx[match(hr.cvdx$SomaId, pdx$Variable),]
+  hr.cvdx$Effect <- pdx2$Effect
+  hr.cvdx$Direction <- ifelse(hr.cvdx$Effect <= 0,"Downregulated","Upregulated")
+  
+  hr.cvdx$Cluster <- cluster
+  #corrx$Direction <- direction
+  hr.cvdx
+}, pd=pd, meta=meta, hr.cvd=hr.cvd) %>% do.call(what = rbind)
+
+
+colnames(cvd.data) <- gsub("\r\n","",colnames(cvd.data))
+cvd.data$Cluster <-factor(cvd.data$Cluster, levels=clusters)
+cvd.data$Target <- meta[match(cvd.data$SomaId, meta$SomaId),"Target"]
+cvd.data$label <- ifelse(abs(log2(cvd.data$HR)) >= log2(1.55), cvd.data$Target,NA)
+```
+
+```{r}
+px <- ggplot(cvd.data, aes(x=Cluster, y=HR, fill=Direction, label=label))+
+  geom_boxplot(alpha=0.5, width=0.5)+
+  ggbeeswarm::geom_beeswarm(alpha=0.5)+
+  geom_hline(yintercept = 1)+
+  scale_fill_manual(values = c("#009AC7","#900D09BB"))+
+  ylab("Hazard ratio (log2)")+
+  facet_grid(~Direction)+
+  scale_y_continuous(trans="log2", breaks=c(0.5,.75,1,1.25,1.5))+
+  ggrepel::geom_text_repel()
+
+plot(px)
+
+pdf("CVD HR_Yang paper.pdf", width=10, height=5)
+px
+dev.off()
+```
+
+
+```{r}
+rio::export(corr.data, file="eGFR_correlation_Yang.xlsx")
+rio::export(cvd.data, file="CVD_data_Yang.xlsx")
+```
