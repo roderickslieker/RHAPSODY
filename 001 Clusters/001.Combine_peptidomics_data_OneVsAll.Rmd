@@ -5,7 +5,7 @@ date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: md_document
 ---
 
-```{r setup, include=FALSE, message=F}
+```{r setup, include=FALSE, message=F, eval=F}
 library(knitr)
 library(survival)
 library(reshape2)
@@ -17,7 +17,7 @@ options(stringsAsFactors = F)
 
 # Read data
 
-```{r}
+```{r, eval=F}
 #COnversion
 load("./002.Data/Conversion_Peptides.RData")
 
@@ -63,7 +63,7 @@ results.MARD.GoDARTS  <- updateData(results.MARD.GoDARTS)
 results.MARDH.GoDARTS <- updateData(results.MARDH.GoDARTS)
 ```
 
-```{r}
+```{r, eval=F}
 get.plot <- function(dataDCS, dataGODARTS, title)
 {
   pd <- data.frame(Beta.DCS = dataDCS$Estimate, Beta.GoDARTS = dataGODARTS$Estimate)
@@ -109,7 +109,7 @@ dev.off()
 
 ```
 
-```{r}
+```{r, eval=F}
 library(meta)
 
 getMetaData <- function(group)
@@ -179,7 +179,7 @@ meta.mardh <- getMetaData("MARDH")
 save(meta.sidd, meta.sird, meta.mod, meta.mard, meta.mardh, file="./003.Figures.combined/Peptidomics GoDARTS DCS meta analysis_onevsall.RData")
 ```
 
-```{r}
+```{r, eval=F}
 head(mean.PeptideData)
 mean.Peptides.M <- melt(mean.PeptideData, id.vars = c("Mean","pep","cluster", "cohort"))
 mean.Peptides.M$pep <- gsub("LBTESTCD.","",mean.Peptides.M$pep)
@@ -206,7 +206,6 @@ getPlot <- function(var)
 
 ```
 
-\newpage 
 
 ```{r, eval=FALSE, echo=TRUE}
 source("./001.Scripts/Utils.R")
@@ -273,7 +272,7 @@ correlation.DCS.GoDARTS <- getCorrelationCluster("ModelData")
 save(correlation.DCS.GoDARTS, file="./002.Data Combined/Correlation_DCS.GoDARTS_PeptidesClinical.RData")
 ```
 
-```{r, echo=F, eval=TRUE}
+```{r, echo=F, eval=FALSE}
 load("002.Data Combined/Correlation_DCS.GoDARTS_PeptidesClinical.RData")
 var.base <- c("VSTESTCD.BMI","AGE","LBTESTCD.HDL","LBTESTCD.HBA1C","LBTESTCD.CPEPTIDE")
 lab.base <- c("BMI","Age","HDL","HbA1C","C-peptide")
@@ -326,9 +325,7 @@ getHdata <- function(var.row, var.col)
 
 ## SIDD
 
-For SIDD, 6 peptides were significant
-
-```{r, eval=TRUE}
+```{r, eval=FALSE}
 meta.sidd.sign <- meta.sidd[meta.sidd$p.adj <= 0.05,]
 table(meta.sidd.sign$Effect.random >= 0)
 
@@ -349,9 +346,7 @@ print(getHdata(var.sidd, var.base))
 
 ## SIRD
 
-For SIRD, 152 peptides were significant
-
-```{r}
+```{r, eval=F}
 meta.sird.sign <- meta.sird[meta.sird$p.adj <= 0.05,]
 table(meta.sird.sign$Effect.random >= 0)
 knitr::kable(meta.sird.sign[,c(1,6:13)])
@@ -375,9 +370,7 @@ print(getHdata(var.sird, var.base))
 
 ## MOD
 
-For MOD, 89 peptides were significant
-
-```{r}
+```{r, eval=F}
 meta.mod.sign <- meta.mod[meta.mod$p.adj <= 0.05,]
 table(meta.mod.sign$Effect.random >= 0)
 knitr::kable(meta.mod.sign[,c(1,6:13)])
@@ -397,9 +390,7 @@ print(getHdata(var.mod, var.base))
 
 ## MARD
 
-For MARD 60 peptides were significant
-
-```{r}
+```{r, eval=F}
 meta.mard.sign <- meta.mard[meta.mard$p.adj <= 0.05,]
 table(meta.mard.sign$Effect.random >= 0)
 knitr::kable(meta.mard.sign[,c(1,6:13)])
@@ -416,11 +407,9 @@ print(getHdata(var.mard, var.base))
 ```
 
 
-## MARDH
+## MDH
 
-For MARDH 94 peptides are significant 
-
-```{r}
+```{r, eval=F}
 meta.mardh.sign <- meta.mardh[meta.mardh$p.adj <= 0.05,]
 table(meta.mardh.sign$Effect.random >= 0)
 knitr::kable(meta.mardh.sign[,c(1,6:13)])
@@ -437,7 +426,7 @@ print(getHdata(var.mardh, var.base))
 
 ## Get heatmap of meta-estimates.
 
-```{r}
+```{r, eval=F}
 vars <- unique(c(meta.sidd.sign$var.sel, meta.sird.sign$var.sel, meta.mod.sign$var.sel,
   meta.mard.sign$var.sel, meta.mardh.sign$var.sel))
 
@@ -488,7 +477,7 @@ dev.off()
 
 ## Circos test
 
-```{r}
+```{r, eval=F}
 lbs <- labels(as.dendrogram(hclust(dist(estimates))))
 
 #lipids.classes <- read.table("002.Data/SwissLipids.csv", sep=",", header=T)
@@ -562,7 +551,7 @@ circos2(R=250,cir=db,W=150,mapping=segv,col.v=4,type="heatmap2",lwd=1, B=F, col.
 circos2(R=410,cir=db,W=20,mapping=segv,type="label",side="out",cex=0.4, col="black")
 ```
 
-```{r}
+```{r, eval=F}
 head(conversion)
 conversion2 <- conversion[match(pd$Description, conversion$Target),]
 head(conversion2)

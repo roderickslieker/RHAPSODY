@@ -1,0 +1,261 @@
+## Load
+
+    load("./003_GRS_data/DCS_GRS_Data.RData")
+    ANDIS_GRS <- rio::import("./003_GRS_data/GRS_Udler.txt")
+    GoDARTS_GRS <- rio::import("./003_GRS_data/GoDARTS_grs.txt")
+
+    library(ggplot2)
+    library(magrittr)
+
+    pvalue <- function(data1, data2)
+    {
+      ks <- colnames(data1)
+      js <- colnames(data2)
+      
+      ks.l <- length(ks)
+      js.l <- length(js)
+      
+      
+      out <- matrix(ncol=js.l, nrow=ks.l )
+      colnames(out) <- js
+      rownames(out) <- ks
+      
+      for(k in ks)
+      {
+        for(j in js)
+        {
+          ts <- cor.test(data1[,k], data2[,j])
+          pv <- ts$p.value
+          out[k,j] <- pv
+        }
+      }
+      return(out)
+    }
+
+
+    updateCluster <- function(x)
+    {
+      x[x=="SIDD"] <- "1/SIDD"
+      x[x=="SIRD"] <- "2/SIRD"
+      x[x=="MOD"] <- "3/MOD"
+      
+      x <- gsub("2/SIDD","1/SIDD",x)
+      x <- gsub("3/SIRD","2/SIRD",x)
+      x <- gsub("4/MOD", "3/MOD",x)
+      x <- gsub("5/MARD/low HDL","4/MD",x)
+      x <- gsub("6/MARD/high HDL","5/MDH",x)
+      x <- gsub("MARD_HIGH_HDL","5/MDH",x)
+      x <- gsub("MARD_LOWER_HDL","4/MD",x)
+
+      x
+      #table(x)
+      #x <- gsub("SIRD","2/SIRD",x)
+      #x <- gsub("MOD","3/MOD",x)
+    }
+
+## Load other data
+
+### GoDARTS
+
+    godarts_florez <- rio::import("./003_GRS_data/godarts_data_for_clustering.csv")
+    clusters <- rio::import("./003_GRS_data/clusters_for_mark.csv")
+    is.g <- intersect(godarts_florez$Prochi, GoDARTS_GRS$sampleId)
+    godarts_florez <- godarts_florez[match(is.g, godarts_florez$Prochi),]
+    GoDARTS_GRS <- GoDARTS_GRS[match(is.g, GoDARTS_GRS$sampleId),]
+    clusters <- clusters[match(is.g, clusters$Prochi),]
+    head(clusters)
+    godarts_florez <- cbind(godarts_florez, GoDARTS_GRS[,-1], NewCluster = clusters[,"cluster_r"])
+    godarts_florez <- godarts_florez[!is.na(godarts_florez$NewCluster),]
+
+### ANDIS
+
+    andis_florez <- load("./003_GRS_data/ANDIS Clustering.RData")
+    andis_florez <- outDataNew;rm(outDataNew)
+
+    is.a <- intersect(andis_florez$PatientID, ANDIS_GRS$PATID)
+    andis_florez <- andis_florez[match(is.a, andis_florez$PatientID),]
+    ANDIS_GRS <- ANDIS_GRS[match(is.a, ANDIS_GRS$PATID),]
+    andis_florez <- cbind(andis_florez, ANDIS_GRS[,-1])
+    head(andis_florez)
+
+### Correlation
+
+    idx1a <- c("AGE","BMI","HBA1C","HDL","CPEPTIDE","HOMA2B","HOMA2IR")
+    idx1 <- c("AGE","BMI","HBA1C","HDL","CPEPTIDE")
+    idx2 <- c("beta.cell","proinsulin","obesity","lipodystrophy","liver")
+
+    andis_florez$CPEPTIDE <- andis_florez$CPEP  
+
+    colnames(andis_florez)[12:16] <- idx2
+    colnames(andis_florez)
+
+    DCS_florez$cohort <- "DCS"
+    godarts_florez$cohort <- "GoDARTS"
+    andis_florez$cohort <- "ANDIS"
+
+    getCor <- function(data, idx1=idx1, idx2=idx2){
+      cor.florez <- cor(data[,idx1],data[,idx2], use = "pairwise.complete.obs", method = "spearman")
+      p.florez <- pvalue(data[,idx1],data[,idx2])
+      px <- ggcorrplot::ggcorrplot(t(cor.florez), p.mat = 1- t(p.florez), sig.level = 0.95, insig = "pch")+
+      scale_fill_gradient2(limit = c(-.15,.15), low = "blue", high =  "red", mid = "white", midpoint = 0.0)
+      mc <- reshape2::melt(cor.florez)
+      colnames(mc) <- c("Var1","Var2","correlation")
+      mp <- reshape2::melt(p.florez)
+      mc$pvalue <- mp$value
+      list(mc, px)
+    }
+
+    dcs <- getCor(data =DCS_florez, idx1=idx1, idx2=idx2)
+    andis <- getCor(data =andis_florez, idx1=idx1, idx2=idx2)
+    godarts <- getCor(data = godarts_florez, idx1=idx1, idx=idx2)
+
+    dcs[[2]]
+    godarts[[2]]
+    andis[[2]]
+
+## Combine data
+
+    all_florez <- rbind(DCS_florez[,c(idx1,idx2,"cohort","NewCluster")],
+                        godarts_florez[,c(idx1,idx2,"cohort","NewCluster")],
+                        andis_florez[,c(idx1,idx2,"cohort","NewCluster")])
+
+    all_florez$NewCluster <- updateCluster(all_florez$NewCluster)
+    table(all_florez$NewCluster)
+    head(all_florez)
+
+### BMI
+
+    ggplot(all_florez, aes(x=obesity, y=BMI, col=cohort))+
+      geom_point(alpha=.5, size=.1)+
+      geom_smooth(method=lm)+
+      scale_color_manual(values = c("#009AC7","#132B41","#F9A23F"))
+
+    lm(BMI~obesity+cohort, data=all_florez)
+    anova(lm(BMI~obesity+cohort, data=all_florez))
+
+### Lipodystrophy
+
+    ggplot(all_florez, aes(x=lipodystrophy, y=HDL, col=cohort))+
+      geom_point(alpha=.5, size=.1)+
+      geom_smooth(method=lm)+
+      scale_color_manual(values = c("#009AC7","#132B41","#F9A23F"))
+
+
+    lm(HDL~lipodystrophy+cohort, data=all_florez)
+    anova(lm(HDL~lipodystrophy+cohort, data=all_florez))
+
+    ggplot(all_florez, aes(x=proinsulin, y=CPEPTIDE, col=cohort))+
+      geom_point(alpha=.5, size=.1)+
+      geom_smooth(method=lm)+
+      scale_color_manual(values = c("#009AC7","#132B41","#F9A23F"))
+
+
+    ggplot(all_florez, aes(x=beta.cell, y=CPEPTIDE, col=cohort))+
+      geom_point(alpha=.5, size=.1)+
+      geom_smooth(method=lm)+
+      scale_color_manual(values = c("#009AC7","#132B41","#F9A23F"))
+
+    lm(CPEPTIDE~proinsulin+cohort, data=all_florez)
+    anova(lm(CPEPTIDE~proinsulin+cohort, data=all_florez))
+
+    lm(CPEPTIDE~beta.cell+cohort, data=all_florez)
+    anova(lm(CPEPTIDE~beta.cell+cohort, data=all_florez))
+
+### Liver
+
+    ggplot(all_florez, aes(x=liver, y=CPEPTIDE, col=cohort))+
+      geom_point(alpha=.5, size=.1)+
+      geom_smooth(method=lm)+
+      scale_color_manual(values = c("#009AC7","#132B41","#F9A23F"))
+
+
+    lm(CPEPTIDE~liver+cohort, data=all_florez)
+    anova(lm(CPEPTIDE~liver+cohort, data=all_florez))
+
+# Clusters
+
+    cols <- c("#4D5A89","#8AA9D6","#F2C5A6","#C04240","#9A9999")
+    library(patchwork)
+
+    px <- ggplot(all_florez, aes(x=NewCluster, y=beta.cell, fill=cohort))+
+      geom_boxplot()+
+      scale_fill_manual(values = cols)+
+      ylab("Beta-cell GRS")+
+      xlab("Cluster")+
+      theme(legend.position = "bottom")+
+      ggtitle("Beta cell")+
+      ggplot(all_florez, aes(x=NewCluster, y=proinsulin, fill=cohort))+
+      geom_boxplot()+
+      scale_fill_manual(values = cols)+
+      ylab("Proinsulin GRS")+
+      xlab("Cluster")+
+      theme(legend.position = "bottom")+
+      ggtitle("Proinsulin")+
+      ggplot(all_florez, aes(x=NewCluster, y=obesity, fill=cohort))+
+      geom_boxplot()+
+      scale_fill_manual(values = cols)+
+      ylab("Obesity GRS")+
+      xlab("Cluster")+
+      theme(legend.position = "bottom")+
+      ggtitle("Obesity")+
+      ggplot(all_florez, aes(x=NewCluster, y=lipodystrophy, fill=cohort))+
+      geom_boxplot()+
+      scale_fill_manual(values = cols)+
+      ylab("Lipodystrophy GRS")+
+      xlab("Cluster")+
+      theme(legend.position = "bottom")+
+      ggtitle("Lipodystrophy")+
+      ggplot(all_florez, aes(x=NewCluster, y=liver, fill=cohort))+
+      geom_boxplot()+
+      scale_fill_manual(values = cols)+
+      ylab("Liver GRS")+
+      xlab("Cluster")+
+      theme(legend.position = "bottom")+
+      ggtitle("Liver")+
+      plot_layout(ncol=5)
+
+
+    plot(px)
+
+    pdf("GRS vs clusters.pdf", width = 15, height=4)
+
+    px
+    dev.off()
+
+    anova(lm(all_florez$beta.cell~all_florez$NewCluster+all_florez$cohort))
+    anova(lm(all_florez$proinsulin~all_florez$NewCluster+all_florez$cohort))
+    anova(lm(all_florez$obesity~all_florez$NewCluster+all_florez$cohort))
+    anova(lm(all_florez$lipodystrophy~all_florez$NewCluster+all_florez$cohort))
+    anova(lm(all_florez$liver~all_florez$NewCluster+all_florez$cohort))
+
+## Per cohort
+
+    test <- function(ref, var)
+    {
+      
+      #head(all_florez)
+      
+      data <- lapply(unique(all_florez$cohort), function(cohort){
+        allf <- all_florez[all_florez$cohort %in% cohort,]
+        fit1 <- lm(allf[,var]~ifelse(allf$NewCluster == ref, 1,0))
+        fit <- anova(fit1)
+        p <- data.frame(ref, var, beta = fit1$coef[[2]], se = summary(fit1)$coefficients[2,2], Pvalue = fit$`Pr(>F)`[[1]], cohort = cohort)
+        p
+      }) %>% do.call(what=rbind)
+      
+      mg <- meta::metagen(TE =  data$beta, seTE = data$se, studlab = data$cohort)
+      out <- data.frame(beta = mg$TE.random, lower = mg$lower.random, upper = mg$upper.random, pvalue = mg$pval.random, i2 = mg$I2, var=var, ref = ref)
+      out
+    }
+
+
+    ovsAll <- rbind(
+      lapply(unique(all_florez$NewCluster), test, var="beta.cell") %>% do.call(what = rbind),
+      lapply(unique(all_florez$NewCluster), test, var="proinsulin") %>% do.call(what = rbind),
+      lapply(unique(all_florez$NewCluster), test, var="obesity") %>% do.call(what = rbind),
+      lapply(unique(all_florez$NewCluster), test, var="lipodystrophy") %>% do.call(what = rbind),
+      lapply(unique(all_florez$NewCluster), test, var="liver") %>% do.call(what = rbind)
+    )
+    ovsAll
+
+    rio::export(ovsAll, file="OnevsAll_export_GRS.xlsx")
