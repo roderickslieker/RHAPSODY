@@ -23,6 +23,10 @@ library(patchwork)
 TAGnew$Colour <- ifelse(TAGnew$FDR <= 0.05, "Sign","NotSign")
 TAGnew$Colour <- factor(TAGnew$Colour, levels=c("NotSign", "Sign"))
 
+ggplot(TAGnew[TAGnew$Cluster %in% "MDH",], aes(x=Carbon, y=Double, col=Effect))+
+  geom_point()+
+  scale_colour_gradientn(colours = c("blue","white","red"))+
+  facet_grid(~Cluster)
 
 px <- ggplot(TAGnew, aes(x=Carbon, y=Effect))+
   geom_point(aes(col=Colour))+
