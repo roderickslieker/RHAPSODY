@@ -134,7 +134,7 @@ chains](https://github.com/roderickslieker/RHAPSODY/blob/master/001%20Clusters/0
 ### Metabolomics
 
 [DCS
-Lipids](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/DCS_Lipids_CoxModels.md)
+Metabolites](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/DCS_Metabolites_CoxModels.md)
 
 [GoDARTS Metabolites
 discovery](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/GoDARTS_Metabolites_CoxModels_Run1.md)
@@ -143,10 +143,13 @@ discovery](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progres
 validation](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/GoDARTS_Metabolites_CoxModels_Run2.md)
 
 [ANDIS Metabolites
-discovery](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/ANDIS_Metabolites_CoxModels_Run1.md)
+discovery](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/Andis_Metabolites_CoxModels_Run1.md)
 
 [ANDIS Metabolites
-validation](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/ANDIS_Metabolites_CoxModels_Run2.md)
+validation](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/Andis_Metabolites_CoxModels_Run2.md)
+
+[Combine
+metabolites](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/Metabolites_Combine_withReplication.html)
 
 ### Lipids
 
@@ -157,7 +160,9 @@ Lipids](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progressio
 Lipids](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/GoDARTS_Lipids_CoxModels.md)
 
 [ANDIS
-Lipids](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/ANDIS_Lipids_CoxModels.md)
+Lipids](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/Andis_Lipids_CoxModels.md)
+
+[Combine Lipids]()
 
 ### Proteins
 
@@ -166,6 +171,3 @@ Proteins](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progress
 
 [GoDARTS
 Proteins](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/GoDARTS_Peptides_CoxModels.md)
-
-[ANDIS
-Proteins](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/ANDIS_Peptides_CoxModels.md)
