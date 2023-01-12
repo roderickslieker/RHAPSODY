@@ -248,3 +248,50 @@ CombineCox <- function(Data01, Data02, ColVar, studyLabels){
   combined$fdr.random <- p.adjust(combined$Pval.random,method="fdr")
   return(combined)
 }
+
+
+
+
+makeMetaSignMatrix <- function(N1,N2,N3,N4,adjust=NULL)
+{
+  #Assign names
+  for(k in 1:4)
+  {
+    temp <- get(get(sprintf("N%s", k)))
+    assign(x = sprintf("Data%s", k), value = temp)
+    rm(temp)
+  }
+  
+  
+  if(!is.null(adjust))
+  {
+    Data1$p.adj <- p.adjust(Data1$Pval.random.adj, method = adjust)
+    Data2$p.adj <- p.adjust(Data2$Pval.random.adj, method = adjust)
+    Data3$p.adj <- p.adjust(Data3$Pval.random.adj, method = adjust)
+    Data4$p.adj <- p.adjust(Data4$Pval.random.adj, method = adjust)
+  }
+  
+  sign.matrix <- matrix(rep(0), ncol=4, nrow=nrow(Data1))
+  
+  #rename
+  rename <- function(x){x <- gsub("meta.","",x); x <- gsub("\\.","/",x)}
+  new.colnames <- do.call(c, lapply(c(N1,N2,N3,N4), rename))
+  colnames(sign.matrix) <- new.colnames
+  rownames(sign.matrix) <- Data1$var
+  
+  Data1.sign <- Data1[Data1$p.adj <= 0.05,]
+  Data2.sign <- Data2[Data2$p.adj <= 0.05,]
+  Data3.sign <- Data3[Data3$p.adj <= 0.05,]
+  Data4.sign <- Data4[Data4$p.adj <= 0.05,]
+  
+  nrow(Data1.sign)
+  nrow(Data2.sign)
+  nrow(Data3.sign)
+  nrow(Data4.sign)
+  
+  sign.matrix[match(Data1.sign$var, rownames(sign.matrix)), new.colnames[1]] <- 1
+  sign.matrix[match(Data2.sign$var, rownames(sign.matrix)), new.colnames[2]] <- 1
+  sign.matrix[match(Data3.sign$var, rownames(sign.matrix)), new.colnames[3]] <- 1
+  sign.matrix[match(Data4.sign$var, rownames(sign.matrix)), new.colnames[4]] <- 1
+  return(sign.matrix)
+}
