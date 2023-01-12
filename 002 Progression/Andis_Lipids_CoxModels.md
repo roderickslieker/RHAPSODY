@@ -1,0 +1,97 @@
+## Load libraries and Utils scripts
+
+    library(datashieldclient)
+    library(dsCDISCclient)
+    library(survminer)
+    library(survival)
+
+    #Load utils
+    source("./000.Final_Scripts/003.Utils/Utils.R")
+    source("./000.Final_Scripts/003.Utils/Utils_GB.R")
+    source("./000.Final_Scripts/003.Utils/Utils_CoxModels.R")
+
+## Login and prepare data
+
+    #Path to login credentials
+    loginpath <- "logindata_template.txt"
+    #Opal datasource
+    datasource <- "opal"
+    #Set cohort
+    cohort <- "andis"
+    #Required data
+    myAttributes <- c("LIPIDOMICS","MEDICATION","BMI","AGE","SEX","HDL","HBA1C","CPEP","TIMETOINSULIN","TIMEINSULINSTATUS","DIABDUR")
+    logIn(datasource, loginpath, cohort)
+
+## Prepare Data
+
+    myTransform <-c(3,0,0,0,0,0,0,0,0,0,0)
+    #Prepare dataframe
+    prepareData(assign="ModelData",opal=opal,attributes=myAttributes,transformVector=myTransform)
+
+## Prepare Formulas
+
+    #MODEL 1 
+    LipoFormula1 <- "survival::Surv(TIMEINSULIN, LBTESTCD.TIMEINSULINSTATUS) ~ %s +
+                                 survival::strata(cut(LBTESTCD.HBA1C ,breaks=c(0,53,75,140))) + age + sex + VSTESTCD.BMI "
+    #MODEL 2
+    LipoFormula2 <- "survival::Surv(TIMEINSULIN, LBTESTCD.TIMEINSULINSTATUS) ~ %s +
+                                 survival::strata(cut(LBTESTCD.HBA1C ,breaks=c(0,53,75,140))) + age + sex + VSTESTCD.BMI + LBTESTCD.HDL + LBTESTCD.CPEP "
+    #MODEL 3
+    LipoFormula3 <- "survival::Surv(TIMEINSULIN, LBTESTCD.TIMEINSULINSTATUS) ~ %s +
+                                 survival::strata(cut(LBTESTCD.HBA1C ,breaks=c(0,53,75,140))) + age + sex + VSTESTCD.BMI + LBTESTCD.HDL + LBTESTCD.CPEP + DIABETESDURATION + glucoselowering"
+
+    #MODEL 4
+    LipoFormula4 <- ("survival::Surv(TIMEINSULIN, LBTESTCD.TIMEINSULINSTATUS) ~ %s +
+                                 survival::strata(cut(LBTESTCD.HBA1C ,breaks=c(0,53,75,140))) + age + sex + VSTESTCD.BMI + LBTESTCD.HDL + LBTESTCD.CPEP")
+
+## Prepare arguments for function call
+
+    targets <- read.table("./002.Data/SwissLipids.csv", header=T, sep=",")
+    lipids <- ds.colnames('ModelData')$andis
+    lipids <- lipids[which(lipids == "LBTESTCD.CE.14.0.0"):which(lipids=="LBTESTCD.TAG.58.8.0")]
+
+## Calculate Cox models for model 1 HbA1c, Age, Sex, BMI
+
+    LiposModel1Andis <- CalculateCoxModel(vars = lipids,
+                                        formula = LipoFormula1,
+                                        targets = targets,
+                                        cohort = "andis",
+                                        omicType = "LIPIDOMICS",
+                                        data = "ModelData")
+    LiposModel1Andis$fdr <- p.adjust(LiposModel1Andis$p.val,method="fdr")
+
+    save(LiposModel1Andis,file="./000.Final_Scripts/001.CoxModels.Data/ANDIS_Lipids_CoxModel_1.RData")
+    knitr::kable(head(LiposModel1Andis[order(LiposModel1Andis$fdr,decreasing = F),],10))
+
+## Calculate Cox models for model 2
+
+HbA1c, Age, Sex, BMI, HDL , CPeptide
+
+    LiposModel2Andis <- CalculateCoxModel(vars = lipids,
+                                        formula = LipoFormula2,
+                                        targets = targets,cohort = "andis",
+                                        omicType = "LIPIDOMICS",
+                                        data = "ModelData")
+    LiposModel2Andis$fdr <- p.adjust(LiposModel2Andis$p.val,method="fdr")
+
+    save(LiposModel2Andis,file="./000.Final_Scripts/001.CoxModels.Data/ANDIS_Lipids_CoxModel_2.RData")
+    knitr::kable(head(LiposModel2Andis[order(LiposModel2Andis$fdr,decreasing = F),],10))
+
+## Calculate Cox models for model 3
+
+HbA1c, Age, Sex, BMI, HDL , CPeptide, Diabetes Duration, Glucose
+Lowering Drugs
+
+    LiposModel3Andis <- CalculateCoxModel(vars = lipids,
+                                        formula = LipoFormula3,
+                                        targets = targets,cohort = "andis",
+                                        omicType = "LIPIDOMICS",
+                                        data = "ModelData")
+    LiposModel3Andis$fdr <- p.adjust(LiposModel3Andis$p.val,method="fdr")
+
+    save(LiposModel3Andis,file="./000.Final_Scripts/001.CoxModels.Data/ANDIS_Lipids_CoxModel_3.RData")
+    knitr::kable(head(LiposModel3Andis[order(LiposModel3Andis$fdr,decreasing = F),],10))
+
+## Logout
+
+    logOut(datasource = datasource)
