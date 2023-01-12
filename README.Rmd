@@ -122,7 +122,7 @@ Adjusted
 [ANDIS Lipids](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/Andis_Lipids_CoxModels.md)
 
 
-[Combine Lipids]()
+[Combine Lipids](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/Lipids_Combine.html)
 
 ### Proteins
 
@@ -130,6 +130,6 @@ Adjusted
 
 [GoDARTS Proteins](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/GoDARTS_Peptides_CoxModels.md)
 
-
+[Combine proteins](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/GoDARTS_Peptides_CoxModels.md)
 
 
