@@ -1,6 +1,8 @@
 ---
 title: "README"
-output: md_document
+output: 
+  md_document:
+    toc: TRUE
 ---
 
 ```{r setup, include=FALSE}
@@ -81,14 +83,25 @@ Adjusted
 
 [Proteomics adjusted](https://github.com/roderickslieker/RHAPSODY/blob/master/001%20Clusters/001_Combine_Proteomics_GLM_Clusters_Adjusted.md)
 
-## Combine Genetic risk scores
+### 4. Combine Genetic risk scores
 
 [GRSs meta-analysis](https://github.com/roderickslieker/RHAPSODY/blob/master/001%20Clusters/002-Combine_GRS_Cohorts.md)
 
-## Compare protein data with Yang et al.
+### 5. Compare protein data with Yang et al.
 
 [Yang et al. comparison](https://github.com/roderickslieker/RHAPSODY/blob/master/001%20Clusters/002-Overlap_Yang.md)
 
-## Compare effect sizes TAG with acyl chain carbon and double bonds
+### 6. Compare effect sizes TAG with acyl chain carbon and double bonds
 
 [Lipid effect sizes vs acyl chains](https://github.com/roderickslieker/RHAPSODY/blob/master/001%20Clusters/002-Overlap_Yang.md)
+
+
+## Progression paper
+
+### Metabolomics
+
+DCS
+
+GoDARTS
+
+ANDIS
