@@ -36,7 +36,7 @@ getCoxModel <- function(peptide, form, cohort="dcs", nameVar = "%s", data){
   form <- as.formula(form)
 
   #Fit GLM
-  cox.res <- tryCatch(suppressWarnings(ds2.coxph(formula = form, data = data, async = FALSE, datasources = opal)), error=function(e) return("Error"))
+  cox.res <- tryCatch(suppressWarnings(dssCoxph(formula = form, data = data, async = FALSE, datasources = opal)), error=function(e) return("Error"))
 
   if(cox.res[1] == "Error")
   {
@@ -143,4 +143,108 @@ prepare.targets <- function(targets)
 
   return(targets)
 
+}
+
+
+CombineCoxThree <- function(Data01, Data02, Data03, ColVar, studyLabels){
+  #Check if dataframes have equal number of rows
+  if(!nrow(Data01) == nrow(Data02)){
+    stop("Dataframes are not of equal length")
+  }
+  #Check if variables are equal and in same order
+  if(!table(as.character(Data01[,ColVar]) == as.character(Data02[,ColVar]))==nrow(Data01)){
+    stop("Variables of dataframes are not in same order")
+  }
+  if(!table(as.character(Data01[,ColVar]) == as.character(Data03[,ColVar]))==nrow(Data01)){
+    stop("Variables of dataframes are not in same order")
+  }
+  
+  combined <- data.frame()
+  variables <-as.character(Data01[,ColVar])
+  
+  for(i in seq_along(variables)){
+    #cat(i)
+    var <- variables[i]
+    tmp.merge <- rbind(Data01[Data01[,ColVar] == var,1:8],
+                       Data02[Data02[,ColVar] == var,1:8],
+                       Data03[Data03[,ColVar] == var,1:8])
+    
+    
+    tmp.combined <- metagen(TE = log(tmp.merge$hr),
+                            seTE = tmp.merge$se.hr,
+                            studlab=studyLabels,
+                            comb.fixed = TRUE,
+                            comb.random = TRUE,
+                            sm="HR")
+    cis <- ci(TE = tmp.combined$TE.random, seTE = tmp.combined$seTE.random, level=0.95, df=NULL, null.effect = 0)
+    summ <- data.frame(var,
+                       #Effect.fixed = tmp.combined$TE.fixed,
+                       #SE.fixed = tmp.combined$seTE.fixed,
+                       #Zval.fixed = tmp.combined$zval.fixed,
+                       #Pval.fixed = tmp.combined$pval.fixed,
+                       Effect.random = exp(tmp.combined$TE.random),
+                       #SE.random = tmp.combined$seTE.random,
+                       lower = exp(cis$lower),
+                       upper = exp(cis$upper),
+                       Zval.random = tmp.combined$zval.random,
+                       Pval.random  = tmp.combined$pval.random,
+                       I2 = summary(tmp.combined)$I2,
+                       Het = pchisq(tmp.combined$Q,1, lower.tail=F))
+    
+    combined <- rbind(combined,summ)
+  }
+  #combined <- combined[order(combined$Pval.random, decreasing=F),]
+  combined$fdr.random <- p.adjust(combined$Pval.random,method="fdr")
+  return(combined)
+}
+
+
+
+
+CombineCox <- function(Data01, Data02, ColVar, studyLabels){
+  #Check if dataframes have equal number of rows
+  if(!nrow(Data01) == nrow(Data02)){
+    stop("Dataframes are not of equal length")
+  }
+  #Check if variables are equal and in same order
+  if(!table(as.character(Data01[,ColVar]) == as.character(Data02[,ColVar]))==nrow(Data01)){
+    stop("Variables of dataframes are not in same order")
+  }
+  
+  
+  combined <- data.frame()
+  variables <-as.character(Data01[,ColVar])
+  
+  for(i in seq_along(variables)){
+    #cat(i)
+    var <- variables[i]
+    tmp.merge <- rbind(Data01[Data01[,ColVar] == var,1:8],
+                       Data02[Data02[,ColVar] == var,1:8])
+    
+    tmp.combined <- metagen(TE = log(tmp.merge$hr),
+                            seTE = tmp.merge$se.hr,
+                            studlab=studyLabels,
+                            comb.fixed = TRUE,
+                            comb.random = TRUE,
+                            sm="HR")
+    cis <- ci(TE = tmp.combined$TE.random, seTE = tmp.combined$seTE.random, level=0.95, df=NULL, null.effect = 0)
+    summ <- data.frame(var,
+                       #Effect.fixed = tmp.combined$TE.fixed,
+                       #SE.fixed = tmp.combined$seTE.fixed,
+                       #Zval.fixed = tmp.combined$zval.fixed,
+                       #Pval.fixed = tmp.combined$pval.fixed,
+                       Effect.random = exp(tmp.combined$TE.random),
+                       #SE.random = tmp.combined$seTE.random,
+                       lower = exp(cis$lower),
+                       upper = exp(cis$upper),
+                       Zval.random = tmp.combined$zval.random,
+                       Pval.random  = tmp.combined$pval.random,
+                       I2 = summary(tmp.combined)$I2,
+                       Het = pchisq(tmp.combined$Q,1, lower.tail=F))
+    
+    combined <- rbind(combined,summ)
+  }
+  #combined <- combined[order(combined$Pval.random, decreasing=F),]
+  combined$fdr.random <- p.adjust(combined$Pval.random,method="fdr")
+  return(combined)
 }

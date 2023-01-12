@@ -244,7 +244,7 @@ medication.module.dcs <- function(object=NULL, opal)
 }
 
 
-transformations <- function(Attribute, transform){
+transformations <- function(Attribute, transform, opal){
 	if(transform == 1){
 		datashield.assign(opal, Attribute, as.symbol(paste0("log(",Attribute,"+1, 10)")))
 	}
@@ -276,7 +276,7 @@ get.sex <- function(omicAttribute,opal){
 }
 
 godarts.insulinstatus <- function(omicAttribute, opal){
-	dssSubset(symbol = "TIMEINSULINSTATUS", what = 'lb', row.filter = sprintf('%s == "%s"',"LBTESTCD","TIMEINSULINSTATUS"), datasources = opal)      
+	  dssSubset(symbol = "TIMEINSULINSTATUS", what = 'lb', row.filter = sprintf('%s == "%s"',"LBTESTCD","TIMEINSULINSTATUS"), datasources = opal)      
     dssPivot("TIMEINSULINSTATUS", "TIMEINSULINSTATUS", by.col="SUBJID",value.var = "LBORRES", formula =sprintf("SUBJID + %s  ~ %s","LBDTC","LBTESTCD"),
                 completeCases = FALSE,fun.aggregate="mean", datasources = opal)
     #PATIENTS WITH INSULIN STATUS DEFINED
@@ -339,18 +339,17 @@ prepareData <- function(assign, opal, attributes, removeNA=FALSE, transformVecto
     #MEDICATION DATA			 	   	
     }else if (attr == "MEDICATION" & cohort == "dcs"){
     	medication.module.dcs(omicAttribute,opal) 
-    }
-    else if(attr == "MEDICATION" & cohort == "godarts"){
+    }else if(attr == "MEDICATION" & cohort == "godarts"){
     	medication.module.godarts(omicAttribute, 90, opal)        	   	   
     #TIME TO INSULIN 	 	   	
     }else if (attr == "TIMETOINSULIN"){
-    	omic.to.insulin(omicAttribute,opal,cohort)    	   	
+    	omic.to.insulin(omicAttribute,opal = opal,cohort)    	   	
     }else if(attr == "AGE"){
     	calc.age(omicAttribute,opal)
     }else if(attr == "SEX"){
     	get.sex(omicAttribute,opal)
-    }else if(attr == "TIMEINSULINSTATUS" & cohort == "godarts"){
-    	godarts.insulinstatus(omicAttribute,opal)
+    #}else if(attr == "TIMEINSULINSTATUS" & cohort == "godarts"){
+  #  	godarts.insulinstatus(omicAttribute,opal)
     }else if(attr == "METABOLOMICS" & cohort == "godarts"){
       METABOLS <- "c('AOHB','AADA','SDMA.ADMA','Ala','AzeA','BOHB','CA','CDCA','Cit','Crea','DCA','GBB','GCA','GDCA','GCDCA','Gln','Glu','Gly','GUDCA','Hcit','Ile','IndS','Kynu','Leu','NMNA','Phe','Taurine','TCA','TDCA','TCDCA','Trp','TUDCA','Tyr','UDCA')"
       dssSubset(symbol = 'METABOLOMICS', what = "lb", row.filter = sprintf('%s %%in%% %s',"LBTESTCD",METABOLS), datasources = opal)
@@ -382,8 +381,8 @@ prepareData <- function(assign, opal, attributes, removeNA=FALSE, transformVecto
       dssSubset(symbol = attr, what = attr, row.filter = sprintf('%s == "%s"',arg[4],arg[5]), datasources = opal)
       #Transpose      
       if(attr == "HBA1C"){
-      	"GODARTS IS REVERSED"
-      	LBORRESHB <- ifelse(cohort == "godarts","%","mmol/mol")      	
+      	#"GODARTS IS REVERSED"
+      	LBORRESHB <- "mmol/mol"#ifelse(cohort == "godarts","%","mmol/mol")      	
       	dssSubset(symbol = attr, what = attr, row.filter = paste0('LBORRESU == "',LBORRESHB,'"'), datasources = opal)
       }
       dssPivot(attr, attr, by.col="SUBJID", value.var = formulaValues[2], formula =sprintf("SUBJID + %s  ~ %s",formulaValues[1],formulaValues[3]),
@@ -403,7 +402,7 @@ prepareData <- function(assign, opal, attributes, removeNA=FALSE, transformVecto
   ds.assign(toAssign = paste0(omicAttribute,"$SUBJID"),newobj = 'SUBJID', datasources = opal)
   removeColumns(opal,attributes)
    
-  TransformData(attributes,transformVector,plusOne)
+  TransformData(attributes,transformVector,plusOne, opal)
   newAttr <-c("SUBJID",attributes)
   ds.cbind(x = newAttr, newobj=assign, datasources = opal)
   
@@ -475,15 +474,15 @@ removeColumns <- function(opal, attributes){
   }
 }
 
-TransformData <- function(attributes,transformVector, plusOne){
+TransformData <- function(attributes,transformVector, plusOne, opal){
   for(iTr in seq_along(attributes)){
     attr <- attributes[iTr]
     transformation <- transformVector[iTr]
-    transformations(Attribute = attr,transformation,plusOne)
+    transformations(Attribute = attr,transformation,plusOne, opal)
   }
 }
 
-transformations <- function(Attribute, transform,plusOne){
+transformations <- function(Attribute, transform,plusOne, opal){
   if(plusOne){
     form <- as.symbol(paste0("log(",Attribute,"+1, 10)"))
   }else{
@@ -524,18 +523,18 @@ omic.to.insulin <- function(omicAttribute,opal,cohort){
     ds.assign(toAssign = "TIMETOINSULIN$LBDTC", newobj = 'INSULIN.DATE', datasources = opal)
     ds.assign(toAssign = paste0(omicAttribute,'$LBDTC'), newobj = 'OMICS.DATE', datasources = opal)
     ds.assign(toAssign = paste0(omicAttribute,'$SUBJID'), newobj = 'SUBJID', datasources = opal)
-    ds.asCharacter("OMICS.DATE","OMICS.DATE")
-    ds.asCharacter("INSULIN.DATE","INSULIN.DATE")
-    ds.dataframe(x = c("SUBJID","OMICS.DATE","INSULIN.DATE"), newobj = 'DATES', datasources = opal)
-    dssAdd.days.interval(newobj = 'DATES',df = 'DATES',description.list =  list(LBTESTCD.TIMEINSULIN.OMICS = list(start_date = 'OMICS.DATE', end_date = 'INSULIN.DATE')), datasources = opal)
+    ds.asCharacter("OMICS.DATE","OMICS.DATE", datasources = opal)
+    ds.asCharacter("INSULIN.DATE","INSULIN.DATE", datasources = opal)
+    ds.dataFrame(x = c("SUBJID","OMICS.DATE","INSULIN.DATE"), newobj = 'DATES', datasources = opal)
+    dssAddDaysInterval(newobj = 'DATES',df = 'DATES',description.list =  list(LBTESTCD.TIMEINSULIN.OMICS = list(start_date = 'OMICS.DATE', end_date = 'INSULIN.DATE')), datasources = opal)
     dssSubset(symbol = 'TIMETOINSULIN', what = 'DATES', row.filter = "DATES$LBTESTCD.TIMEINSULIN.OMICS > 0", datasources = opal)
     dssSubset(symbol = omicAttribute, what = omicAttribute, row.filter = paste0('match(TIMETOINSULIN$SUBJID,',omicAttribute,'$SUBJID)'), datasources = opal)
     #Organize data frame
     ds.assign(toAssign = "TIMETOINSULIN$SUBJID", newobj = 'SUBJID', datasources = opal)
     ds.assign(toAssign = "TIMETOINSULIN$OMICS.DATE", newobj = 'LBDTC', datasources = opal)
     ds.assign(toAssign = as.symbol("TIMETOINSULIN$LBTESTCD.TIMEINSULIN.OMICS / 365"), newobj = 'TIMEINSULIN', datasources = opal)
-    ds.asCharacter("TIMEINSULIN","TIMEINSULIN")
-    ds.dataframe(x = c("SUBJID","LBDTC","TIMEINSULIN"), newobj = 'TIMETOINSULIN', datasources = opal)
+    ds.asCharacter("TIMEINSULIN","TIMEINSULIN", datasources = opal)
+    ds.dataFrame(x = c("SUBJID","LBDTC","TIMEINSULIN"), newobj = 'TIMETOINSULIN', datasources = opal)
   }
   else if(cohort == "godarts"){
     dssSubset(symbol = 'TIMETOINSULIN', what = 'lb', row.filter = 'LBTESTCD == "TIMEINSULIN"', datasources = opal)
@@ -543,15 +542,15 @@ omic.to.insulin <- function(omicAttribute,opal,cohort){
     ds.assign(toAssign = "TIMETOINSULIN$LBDTC", newobj = 'INSULIN.DATE', datasources = opal)
     ds.assign(toAssign = paste0(omicAttribute,'$LBDTC'), newobj = 'OMICS.DATE', datasources = opal)
     ds.assign(toAssign = paste0(omicAttribute,'$SUBJID'), newobj = 'SUBJID', datasources = opal)
-    ds.dataframe(x = c("SUBJID","OMICS.DATE","INSULIN.DATE"), newobj = 'DATES', datasources = opal)
-    dssAdd.days.interval(newobj = 'DATES',df = 'DATES',description.list =  list(LBTESTCD.TIMEINSULIN.OMICS = list(start_date = 'OMICS.DATE', end_date = 'INSULIN.DATE')), datasources = opal)
+    ds.dataFrame(x = c("SUBJID","OMICS.DATE","INSULIN.DATE"), newobj = 'DATES', datasources = opal)
+    dssAddDaysInterval(newobj = 'DATES',df = 'DATES',description.list =  list(LBTESTCD.TIMEINSULIN.OMICS = list(start_date = 'OMICS.DATE', end_date = 'INSULIN.DATE')), datasources = opal)
     dssSubset(symbol = 'TIMETOINSULIN', what = 'DATES', row.filter = "DATES$LBTESTCD.TIMEINSULIN.OMICS > 0", datasources = opal)
     dssSubset(symbol = omicAttribute, what = omicAttribute, row.filter = paste0('match(TIMETOINSULIN$SUBJID,',omicAttribute,'$SUBJID)'), datasources = opal)
     #Organize data frame
     ds.assign(toAssign = "TIMETOINSULIN$SUBJID", newobj = 'SUBJID', datasources = opal)
     ds.assign(toAssign = "TIMETOINSULIN$OMICS.DATE", newobj = 'LBDTC', datasources = opal)
     ds.assign(toAssign = as.symbol("TIMETOINSULIN$LBTESTCD.TIMEINSULIN.OMICS / 365"), newobj = 'TIMEINSULIN', datasources = opal)
-    ds.dataframe(x = c("SUBJID","LBDTC","TIMEINSULIN"), newobj = 'TIMETOINSULIN', datasources = opal)
+    ds.dataFrame(x = c("SUBJID","LBDTC","TIMEINSULIN"), newobj = 'TIMETOINSULIN', datasources = opal)
   }
   else if(cohort == "andis"){
     dssSubset(symbol = 'TIMETOINSULIN', what = 'lb', row.filter = 'LBTESTCD == "TIMEINSULIN"', datasources = opal)

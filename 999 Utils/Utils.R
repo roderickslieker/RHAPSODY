@@ -159,3 +159,51 @@ CombineGLMTwo <- function(Data01, Data02, ColVar, studyLabels){
   combined <- combined[order(combined$Pval.random, decreasing=F),]
   return(combined)
 }
+
+
+getCoxModelInteraction <- function(variable, form, cohort="dcs", nameVar = "%s", data){
+  cat(variable,'\n')
+  form <- sprintf(form, variable)
+  form <- as.formula(form)
+  
+  #Fit GLM
+  cox.res <- tryCatch(suppressWarnings(dssCoxph(formula = form, data = data, async = FALSE, datasources = opal)), error=function(e) return("Error"))
+  
+  if(cox.res[1] == "Error")
+  {
+    cat(sprintf("Error model did not work for var %s", variable))
+    variable2 <- gsub("LBTESTCD\\.","",variable)
+    out <- data.frame(variable=variable2, hr=NA, se.hr=NA, lower=NA, upper=NA, p.val=NA, n.case=NA, n.event=NA)
+    
+  }else{
+    #Select cohort
+    cox.res.sel <- cox.res[[cohort]]
+    
+    #Create out table
+    n.case <- cox.res.sel$model$n
+    n.event <- cox.res.sel$model$nevent
+    sm <- summary(cox.res.sel$model)
+    
+    #New log name
+    #variable.log <- sprintf(nameVar, variable)
+    
+    nameVar <- sprintf(nameVar, variable)
+    #Fetch
+    p.val <- sm$coefficients[nameVar,"Pr(>|z|)"]
+    lower <- sm$conf.int[nameVar,"lower .95"]
+    upper <- sm$conf.int[nameVar,"upper .95"]
+    hr <- sm$conf.int[nameVar,"exp(coef)"]
+    se.hr <- sm$coefficients[nameVar,"se(coef)"]
+    
+    variable2 <- gsub("LBTESTCD\\.","",variable)
+    out <- data.frame(variable=nameVar, hr, se.hr, lower, upper, p.val, n.case, n.event)
+    
+    rm(cox.res, form,variable2, hr, se.hr, lower, upper, p.val, n.case, n.event)
+    
+  }
+  
+  #out
+  return(out)
+}
+
+
