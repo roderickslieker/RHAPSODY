@@ -16,6 +16,9 @@
     -   <a href="#metabolomics-1" id="toc-metabolomics-1">Metabolomics</a>
     -   <a href="#lipids" id="toc-lipids">Lipids</a>
     -   <a href="#proteins" id="toc-proteins">Proteins</a>
+-   <a href="#interaction-models" id="toc-interaction-models">Interaction
+    models</a>
+-   <a href="#acyl-chains" id="toc-acyl-chains">Acyl chains</a>
 
 ## Clusters
 
@@ -162,7 +165,8 @@ Lipids](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progressio
 [ANDIS
 Lipids](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/Andis_Lipids_CoxModels.md)
 
-[Combine Lipids]()
+[Combine
+Lipids](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/Lipids_Combine.html)
 
 ### Proteins
 
@@ -171,3 +175,19 @@ Proteins](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progress
 
 [GoDARTS
 Proteins](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/GoDARTS_Peptides_CoxModels.md)
+
+[Combine
+proteins](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/GoDARTS_Peptides_CoxModels.md)
+
+## Interaction models
+
+[DCS](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/DCS_Sensitivity_Analyses_BMI_Cpep.md)
+
+[GODARTS](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/GoDARTS_Sensitivity_Analyses_BMI_Cpep.md)
+
+[ANDIS](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/ANDIS_Sensitivity_Analyses_BMI_Cpep.md)
+
+## Acyl chains
+
+[Acyl chains from Source Data
+1](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/Double_bonds_vs_acylchain.R)

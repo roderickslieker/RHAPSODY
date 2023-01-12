@@ -133,3 +133,15 @@ Adjusted
 [Combine proteins](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/GoDARTS_Peptides_CoxModels.md)
 
 
+## Interaction models
+
+[DCS](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/DCS_Sensitivity_Analyses_BMI_Cpep.md)
+
+[GODARTS](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/GoDARTS_Sensitivity_Analyses_BMI_Cpep.md)
+
+[ANDIS](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/ANDIS_Sensitivity_Analyses_BMI_Cpep.md)
+
+
+## Acyl chains
+
+[Acyl chains from Source Data 1](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/Double_bonds_vs_acylchain.R)
