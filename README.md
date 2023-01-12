@@ -1,3 +1,22 @@
+-   <a href="#clusters" id="toc-clusters">Clusters</a>
+    -   <a href="#metabolomics" id="toc-metabolomics">1.Metabolomics</a>
+    -   <a href="#lipidomics" id="toc-lipidomics">2.Lipidomics</a>
+    -   <a href="#proteomics" id="toc-proteomics">3. Proteomics</a>
+    -   <a href="#combine-genetic-risk-scores"
+        id="toc-combine-genetic-risk-scores">4. Combine Genetic risk scores</a>
+    -   <a href="#compare-protein-data-with-yang-et-al."
+        id="toc-compare-protein-data-with-yang-et-al.">5. Compare protein data
+        with Yang et al.</a>
+    -   <a
+        href="#compare-effect-sizes-tag-with-acyl-chain-carbon-and-double-bonds"
+        id="toc-compare-effect-sizes-tag-with-acyl-chain-carbon-and-double-bonds">6.
+        Compare effect sizes TAG with acyl chain carbon and double bonds</a>
+-   <a href="#progression-paper" id="toc-progression-paper">Progression
+    paper</a>
+    -   <a href="#metabolomics-1" id="toc-metabolomics-1">Metabolomics</a>
+    -   <a href="#lipids" id="toc-lipids">Lipids</a>
+    -   <a href="#proteins" id="toc-proteins">Proteins</a>
+
 ## Clusters
 
 Analyses were performed on individual federated nodes. Hereafter,
@@ -95,17 +114,58 @@ unadjusted](https://github.com/roderickslieker/RHAPSODY/blob/master/001%20Cluste
 [Proteomics
 adjusted](https://github.com/roderickslieker/RHAPSODY/blob/master/001%20Clusters/001_Combine_Proteomics_GLM_Clusters_Adjusted.md)
 
-## Combine Genetic risk scores
+### 4. Combine Genetic risk scores
 
 [GRSs
 meta-analysis](https://github.com/roderickslieker/RHAPSODY/blob/master/001%20Clusters/002-Combine_GRS_Cohorts.md)
 
-## Compare protein data with Yang et al.
+### 5. Compare protein data with Yang et al.
 
 [Yang et
 al. comparison](https://github.com/roderickslieker/RHAPSODY/blob/master/001%20Clusters/002-Overlap_Yang.md)
 
-## Compare effect sizes TAG with acyl chain carbon and double bonds
+### 6. Compare effect sizes TAG with acyl chain carbon and double bonds
 
 [Lipid effect sizes vs acyl
 chains](https://github.com/roderickslieker/RHAPSODY/blob/master/001%20Clusters/002-Overlap_Yang.md)
+
+## Progression paper
+
+### Metabolomics
+
+[DCS
+Lipids](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/DCS_Lipids_CoxModels.md)
+
+[GoDARTS Metabolites
+discovery](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/GoDARTS_Metabolites_CoxModels_Run1.md)
+
+[GoDARTS Metabolites
+validation](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/GoDARTS_Metabolites_CoxModels_Run2.md)
+
+[ANDIS Metabolites
+discovery](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/ANDIS_Metabolites_CoxModels_Run1.md)
+
+[ANDIS Metabolites
+validation](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/ANDIS_Metabolites_CoxModels_Run2.md)
+
+### Lipids
+
+[DCS
+Lipids](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/DCS_Lipids_CoxModels.md)
+
+[GoDARTS
+Lipids](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/GoDARTS_Lipids_CoxModels.md)
+
+[ANDIS
+Lipids](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/ANDIS_Lipids_CoxModels.md)
+
+### Proteins
+
+[DCS
+Proteins](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/DCS_Peptides_CoxModels.md)
+
+[GoDARTS
+Proteins](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/GoDARTS_Peptides_CoxModels.md)
+
+[ANDIS
+Proteins](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/ANDIS_Peptides_CoxModels.md)

@@ -100,8 +100,30 @@ Adjusted
 
 ### Metabolomics
 
-DCS
+[DCS Lipids](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/DCS_Lipids_CoxModels.md)
 
-GoDARTS
+[GoDARTS Metabolites discovery](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/GoDARTS_Metabolites_CoxModels_Run1.md)
 
-ANDIS
+[GoDARTS Metabolites validation](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/GoDARTS_Metabolites_CoxModels_Run2.md)
+
+[ANDIS Metabolites discovery](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/ANDIS_Metabolites_CoxModels_Run1.md)
+
+[ANDIS Metabolites validation](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/ANDIS_Metabolites_CoxModels_Run2.md)
+
+### Lipids
+
+[DCS Lipids](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/DCS_Lipids_CoxModels.md)
+
+[GoDARTS Lipids](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/GoDARTS_Lipids_CoxModels.md)
+
+[ANDIS Lipids](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/ANDIS_Lipids_CoxModels.md)
+
+### Proteins
+
+[DCS Proteins](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/DCS_Peptides_CoxModels.md)
+
+[GoDARTS Proteins](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/GoDARTS_Peptides_CoxModels.md)
+
+[ANDIS Proteins](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/ANDIS_Peptides_CoxModels.md)
+
+
