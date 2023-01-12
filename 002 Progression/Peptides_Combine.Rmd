@@ -1,0 +1,449 @@
+---
+title: "Combine Peptides"
+author: "Gerard Bouland"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE, message=F}
+library(survminer)
+library(survival)
+library(reshape2)
+library(viridis)
+library(ggplot2)
+library(NMF)
+library(meta)
+knitr::opts_knit$set(root.dir = "D:/001_Projects/001_RHAPSODY")
+setwd("D:/001_Projects/001_RHAPSODY")
+```
+
+## Load data
+
+```{r}
+load("./002.Data/Conversion_Peptides.RData")
+source("./000.Final_Scripts/003.Utils/forestplot.R")
+source("./000.Final_Scripts/003.Utils/Utils_CoxModels.R")
+source("./000.Final_Scripts/003.Utils/CoxUtils.R")
+```
+
+## Model 1 HbA1c, age, sex, bmi
+
+
+### Load 
+
+```{r CombineModel1,out.width=900}
+load("./000.Final_Scripts/001.CoxModels.Data/DCS_Peptides_CoxModel_1.RData")
+load("./000.Final_Scripts/001.CoxModels.Data/DCS_Peptides_CoxModel_2.RData")
+load("./000.Final_Scripts/001.CoxModels.Data/DCS_Peptides_CoxModel_3.RData")
+
+load("./000.Final_Scripts/001.CoxModels.Data/GODARTS_Peptides_CoxModel_1.RData")
+load("./000.Final_Scripts/001.CoxModels.Data/GODARTS_Peptides_CoxModel_2.RData")
+load("./000.Final_Scripts/001.CoxModels.Data/GODARTS_Peptides_CoxModel_3.RData")
+```
+
+
+### Match 
+
+```{r}
+##MATCH##
+tmp <- c(as.character(PeptidesModel1DCS$variable),as.character(PeptidesModel1GODARTS$variable))
+tmp <- tmp[duplicated(tmp)]
+DCS_Peptides_Model_1 <- PeptidesModel1DCS[match(tmp,PeptidesModel1DCS$variable),]
+GODARTS_Peptides_Model_1 <- PeptidesModel1GODARTS[match(tmp,PeptidesModel1GODARTS$variable),]
+
+DCS_Peptides_Model_2 <- PeptidesModel2DCS[match(tmp,PeptidesModel2DCS$variable),]
+GODARTS_Peptides_Model_2 <- PeptidesModel2GODARTS[match(tmp,PeptidesModel2GODARTS$variable),]
+
+DCS_Peptides_Model_3 <- PeptidesModel3DCS[match(tmp,PeptidesModel3DCS$variable),]
+GODARTS_Peptides_Model_3 <- PeptidesModel3GODARTS[match(tmp,PeptidesModel3GODARTS$variable),]
+
+
+
+
+Combined_Peptides_Model_1 <- CombineCox(Data01 = DCS_Peptides_Model_1,
+                                       Data02 = GODARTS_Peptides_Model_1,
+                                       ColVar = "variable",
+                                       studyLabels = c("DCS","GoDARTS"))
+
+
+Combined_Peptides_Model_2 <- CombineCox(Data01 = DCS_Peptides_Model_2,
+                                       Data02 = GODARTS_Peptides_Model_2,
+                                       ColVar = "variable",
+                                       studyLabels = c("DCS","GoDARTS"))
+
+
+Combined_Peptides_Model_3 <- CombineCox(Data01 = DCS_Peptides_Model_3,
+                                       Data02 = GODARTS_Peptides_Model_3,
+                                       ColVar = "variable",
+                                       studyLabels = c("DCS","GoDARTS"))
+
+conversion_Model_1 <- conversion[match(Combined_Peptides_Model_1$var,conversion$SomaId),]
+Combined_Peptides_Model_1$Target <- conversion_Model_1$Target
+
+var <- c("MIC-1","Nogo Receptor","IL-18 Ra","CREL1","ENPP7","Fas, soluble","HSP 90b","SMAC","Coactosin-like protein","Testican-1","HEMK2")
+
+knitr::kable(head(Combined_Peptides_Model_1,20))
+save(Combined_Peptides_Model_1,file="Combined_Peptides_CoxModel_1.RData")
+```
+
+
+## Recalculate CIs
+
+```{r}
+nsign <- sum(Combined_Peptides_Model_1$fdr.random <= 0.1)
+
+ci <- (1-((0.05*nsign)/1195))
+
+
+cis.new <- ci(TE = log(Combined_Peptides_Model_1$Effect.random), seTE = Combined_Peptides_Model_1$SE.random, level=ci, df=NULL, null.effect = 0)
+
+Combined_Peptides_Model_1$Adj.low <- exp(cis.new$lower)
+Combined_Peptides_Model_1$Adj.high <- exp(cis.new$upper)
+
+rio::export(Combined_Peptides_Model_1, file="./000.Final_Scripts/001.CoxModels.Combine/Peptides_Model1_Threecohorts.xlsx", overwrite=T)
+
+rio::export(Combined_Peptides_Model_2, file="./000.Final_Scripts/001.CoxModels.Combine/Peptides_Model2_Threecohorts.xlsx", overwrite=T)
+
+rio::export(Combined_Peptides_Model_3, file="./000.Final_Scripts/001.CoxModels.Combine/Peptides_Model3_Threecohorts.xlsx", overwrite=T)
+```
+
+## Overwrite CIs
+
+```{r}
+Combined_Peptides_Model_1$lower <- Combined_Peptides_Model_1$Adj.low
+Combined_Peptides_Model_1$upper <- Combined_Peptides_Model_1$Adj.high
+
+Combined_Peptides_Model_1 <- Combined_Peptides_Model_1[,-c(12,13)]
+```
+
+## Add cohort data
+
+```{r}
+discovery.data.b <- rbind(
+  addCohort(vars = var, data = DCS_Peptides_Model_1, group = "DCS (disc)"),
+  addCohort(vars = var, data = GODARTS_Peptides_Model_1, group = "GoDARTS (disc)")
+)
+discovery.data.b$var <- var
+discovery.data.b$Type <- "Cox (time to insulin)"
+
+Combined_Peptides_Model_1$variable <- Combined_Peptides_Model_1$var
+Combined_Peptides_Model_1s <- Combined_Peptides_Model_1[match(var, Combined_Peptides_Model_1$Target),]
+Combined_Peptides_Model_1s$Group <- "Discovery (m1)"
+
+discovery.data <- updateData(Combined_Peptides_Model_1s)
+discovery.data$var == Combined_Peptides_Model_1s$var
+discovery.data$var <- Combined_Peptides_Model_1s$Target
+```
+
+## ACCELERATE
+
+```{r}
+accelerate <- rio::import("D:/001_Projects/001_RHAPSODY/010.ACCELERATE/Accelerate.data.model_complete.xlsx")
+accelerate$name <- gsub("NOGOR","Nogo Receptor", accelerate$name)
+accelerate <- accelerate[,c("var","HR","Lower","Upper","P-value","Group","Type")]
+accelerate <- accelerate[accelerate$var %in% var,]
+```
+
+```{r}
+discovery.data.c <- rbind(discovery.data.b, discovery.data, accelerate)
+#discovery.data.c
+discovery.data.c$var <- factor(as.character(discovery.data.c$var), levels=var)
+``` 
+
+```{r}
+pepval <- rio::import("./000.Final_Scripts/008.Validation/PeptideValidation.xlsx")
+pepval <- pepval[pepval$var %in% var,]
+pepval <- pepval[,c("var","HR","Lower","Upper","P-value","Group","Type")]
+pepval$Shape <- "Cohorts"
+pepval$var <- factor(as.character(pepval$var), levels=var)
+pepval$Symbol <- ifelse(pepval$Group == "Discovery (m1)","Summary","Single")
+pepval$Upper <- as.numeric(pepval$Upper)
+pepval$Lower <- as.numeric(pepval$Lower)
+``` 
+
+
+
+```{r,eval=TRUE}
+dodgex=1
+plotdata <- discovery.data.c
+plotdata$Shape <- "Cohorts"
+plotdata$Symbol <- ifelse(plotdata$Group %in% c("Discovery (m1)","Validation (m1)"),"Summary","Single")
+plotdata$Group <- factor(plotdata$Group, levels=rev(c("DCS (disc)","GoDARTS (disc)","Discovery (m1)","ACCELERATE","ANDIS","Validation (m1)","MDC")))
+plotdata$label <- sprintf("%s [%s,%s]", format(round(plotdata$HR,2), nsmall=2),
+                          format(round(plotdata$Lower,2), nsmall=2),
+                          format(round(plotdata$Upper,2), nsmall=2))
+
+pepval$label <- sprintf("%s [%s,%s]", format(round(pepval$HR,2), nsmall=2),
+                          format(round(pepval$Lower,2), nsmall=2),
+                          format(round(pepval$Upper,2), nsmall=2))
+
+
+pepval$label[grep("NA",pepval$label)] <- ""
+
+
+
+rio::export(plotdata, file="./SourceData.Figure3.Panel.left.xlsx")
+
+p1 <- ggplot(plotdata, aes(x=HR, y=Group, col=Group, shape=Symbol))+
+  geom_vline(xintercept = 1, lty=2, col="#A4A4A4")+
+  geom_point(position = position_dodge(dodgex), aes(size=Symbol))+
+  facet_grid(var~Type,scale="free")+
+  geom_errorbarh(aes(xmin=Lower, xmax=Upper), position = position_dodge(dodgex), height=.5)+
+  scale_x_continuous(trans="log2", breaks=c(0.75,1, 1.5,2,4), limits=c(0.5,4))+
+  geom_point(data = plotdata[which(plotdata$Lower == 0.65),], aes(x=Lower, y=Group),position = position_dodge(dodgex), pch="<")+
+  geom_point(data = plotdata[which(plotdata$Upper == 2),], aes(x=Upper, y=Group),position = position_dodge(dodgex), pch=">")+
+  geom_text(aes(x=3, y=Group, label=label), col="black", size=2.5)+
+  scale_shape_manual(values = c(16,18))+
+    scale_size_manual(values=c(2,3))+
+    scale_colour_manual(values = rev(c("#009AC7","#007ca0","#00212a","#34633b","#25472A","#25472A")))+
+  theme(legend.position = "none")+
+  xlab("Hazard ratio (log2)")
+
+p1
+
+rio::export(pepval[pepval$Type == "Incident diabetes (logistic)",], file="./SourceData.Figure3.Panel.middle.xlsx")
+
+p2 <- ggplot(pepval[pepval$Type == "Incident diabetes (logistic)",], aes(x=HR, y=Group, col=Group, shape=Symbol))+
+   geom_point(position = position_dodge(dodgex), size=2)+
+   facet_grid(var~Type,scale="free", )+
+   geom_vline(xintercept = 1, lty=2, col="#A4A4A4")+
+   geom_errorbarh(aes(xmin=Lower, xmax=Upper), position = position_dodge(dodgex), height=.5)+
+   scale_x_continuous(trans="log2", breaks=c(0.75,1, 1.5,2,4), limits=c(0.5,6))+
+   geom_point(data = plotdata[which(plotdata$Lower == 0.65),], aes(x=Lower, y=Group),position = position_dodge(dodgex), pch="<")+
+   geom_point(data = plotdata[which(plotdata$Upper == 2),], aes(x=Upper, y=Group),position = position_dodge(dodgex), pch=">")+
+   scale_shape_manual(values = c(16,18))+
+     geom_text(aes(x=4, y=Group, label=label), col="black", size=2.5)+
+       scale_colour_manual(values = rev(c("#C16666", "#3d0000")))+
+   theme(legend.position = "none")+
+   xlab("Odds ratio (log2)")
+p2
+
+
+rio::export(pepval[!pepval$Type == "Incident diabetes (logistic)" & 
+                      !is.na(pepval$HR) & 
+                      !pepval$Group %in%  c("QMDiab","Beijer"),], file="./SourceData.Figure3.Panel.right.xlsx")
+
+
+p3 <- ggplot(pepval[!pepval$Type == "Incident diabetes (logistic)" & 
+                      !is.na(pepval$HR) & 
+                      !pepval$Group %in%  c("QMDiab","Beijer"),], aes(x=HR, y=Group, col=Group, shape=Symbol))+
+  geom_point(position = position_dodge(dodgex), size=2)+
+  facet_grid(var~Type,scale="free")+
+  geom_vline(xintercept = 1, lty=2, col="#A4A4A4")+
+  geom_errorbarh(aes(xmin=Lower, xmax=Upper), position = position_dodge(dodgex), height=.5)+
+  scale_x_continuous(trans="log2", breaks=c(0.75,1, 1.5,2,4), limits=c(0.5,10))+
+  geom_point(data = plotdata[which(plotdata$Lower == 0.65),], aes(x=Lower, y=Group),position = position_dodge(dodgex), pch="<")+
+  geom_point(data = plotdata[which(plotdata$Upper == 2),], aes(x=Upper, y=Group),position = position_dodge(dodgex), pch=">")+
+  scale_shape_manual(values = c(16,18))+
+  geom_text(aes(x=7.5, y=Group, label=label), col="black", size=2.5)+
+    scale_colour_manual(values = rev(c("#990000","#6b0000","#3d0000")))+
+  theme(legend.position = "none")+
+  xlab("Odds ratio (log2)")
+p3
+
+library(patchwork)
+px <- p1+p2+p3
+
+px
+```
+
+
+```{r}
+pdf("./000.Final_Scripts/008.Validation/Peptide_validation_external.pdf", width=12, height=8)
+px
+dev.off()
+```
+
+
+```{r}
+plotdata$newGroup <- ifelse(plotdata$Group %in% c("ANDIS","ACCELERATE"),"Validation","Discovery")
+plotdatax <- plotdata[plotdata$var %in% c("MIC-1", "Fas, soluble","IL-18 Ra","ENPP7","CREL1","Nogo Receptor"),]
+plotdatax$var <- factor(plotdatax$var)
+
+
+pdf("D:/001_Projects/001_RHAPSODY/000.Final_Scripts/008.Validation/Figure_BB.pdf", width=8, height=4)
+
+
+ggplot(plotdatax[plotdatax$newGroup == "Discovery",], aes(x=HR, y=Group, col=Group, shape=Symbol))+
+  geom_vline(xintercept = 1, lty=2, col="#A4A4A4")+
+  geom_point(position = position_dodge(dodgex), aes(size=Symbol))+
+  facet_grid(var~.)+
+  geom_errorbarh(aes(xmin=Lower, xmax=Upper), position = position_dodge(dodgex), height=.5)+
+  scale_x_continuous(trans="log2", breaks=c(0.75,1, 1.5,2,4), limits=c(0.5,4))+
+  geom_point(data = plotdatax[which(plotdatax$Lower == 0.65),], aes(x=Lower, y=Group),position = position_dodge(dodgex), pch="<")+
+  geom_point(data = plotdatax[which(plotdatax$Upper == 2),], aes(x=Upper, y=Group),position = position_dodge(dodgex), pch=">")+
+  geom_text(aes(x=3, y=Group, label=label), col="black", size=3)+
+  scale_shape_manual(values = c(16,18))+
+  scale_size_manual(values=c(2,3))+
+  scale_colour_manual(values = rev(c("#009AC7","#007ca0","#00212a","#34633b","#25472A","#25472A")))+
+  theme(legend.position = "none")+
+  xlab("Hazard ratio (log2)")+
+
+  
+  
+ggplot(plotdatax[plotdatax$newGroup == "Validation",], aes(x=HR, y=Group, col=Group, shape=Symbol))+
+  geom_vline(xintercept = 1, lty=2, col="#A4A4A4")+
+  geom_point(position = position_dodge(dodgex), aes(size=Symbol))+
+  facet_grid(var~., scale="free_y", drop = FALSE)+
+  geom_errorbarh(aes(xmin=Lower, xmax=Upper), position = position_dodge(dodgex), height=.5)+
+  scale_x_continuous(trans="log2", breaks=c(0.75,1, 1.5,2,4), limits=c(0.5,4))+
+  geom_point(data = plotdatax[which(plotdatax$Lower == 0.65),], aes(x=Lower, y=Group),position = position_dodge(dodgex), pch="<")+
+  geom_point(data = plotdatax[which(plotdatax$Upper == 2),], aes(x=Upper, y=Group),position = position_dodge(dodgex), pch=">")+
+  geom_text(aes(x=3, y=Group, label=label), col="black", size=3)+
+  scale_shape_manual(values = c(16,18))+
+  scale_size_manual(values=c(2,3))+
+  scale_colour_manual(values = rev(c("#009AC7","#007ca0","#00212a")))+
+  theme(legend.position = "none")+
+  xlab("Hazard ratio (log2)")
+
+
+
+
+dev.off()
+```
+
+
+```{r}
+subset <- plotdata[plotdata$Group %in% c("Discovery (m1)", "Validation (m1)"),]
+
+p1x <- ggplot(subset, aes(x=HR, y=var, col=Group))+
+  geom_vline(xintercept = 1, lty=2, col="#A4A4A4")+
+  geom_point(position = position_dodge(dodgex))+
+  #facet_grid(var~Type,scale="free")+
+  geom_errorbarh(aes(xmin=Lower, xmax=Upper), position = position_dodge(dodgex), height=.5)+
+  scale_x_continuous(trans="log2", breaks=c(0.75,1, 1.5,2,4), limits=c(0.5,4))+
+  geom_point(data = plotdata[which(plotdata$Lower == 0.65),], aes(x=Lower, y=var),position = position_dodge(dodgex), pch="<")+
+  geom_point(data = plotdata[which(plotdata$Upper == 2),], aes(x=Upper, y=var),position = position_dodge(dodgex), pch=">")+
+  geom_text(aes(x=3, y=var, label=label, group=Group), col="black", size=2, position = position_dodge(width = dodgex))+
+  scale_shape_manual(values = c(16,18))+
+    scale_size_manual(values=c(2,3))+
+    scale_colour_manual(values = rev(c("#25472A","#92A394")))+
+  theme(legend.position = "none")+
+  xlab("Hazard ratio (log2)")+
+  scale_y_discrete(limits = rev(levels(subset$var)))
+
+p1x
+
+p2x <- ggplot(pepval[pepval$Type == "Incident diabetes (logistic)",], aes(x=HR, y=var, col=Group, shape=Symbol))+
+   geom_point(position = position_dodge(dodgex), size=2)+
+   #facet_grid(var~Type,scale="free", )+
+   geom_vline(xintercept = 1, lty=2, col="#A4A4A4")+
+   geom_errorbarh(aes(xmin=Lower, xmax=Upper), position = position_dodge(dodgex), height=.5)+
+   scale_x_continuous(trans="log2", breaks=c(0.75,1, 1.5,2,4), limits=c(0.5,6))+
+   geom_point(data = plotdata[which(plotdata$Lower == 0.65),], aes(x=Lower, y=var),position = position_dodge(dodgex), pch="<")+
+   geom_point(data = plotdata[which(plotdata$Upper == 2),], aes(x=Upper, y=var),position = position_dodge(dodgex), pch=">")+
+   scale_shape_manual(values = c(16,18))+
+     geom_text(aes(x=4, y=var, label=label, group=Group), col="black", size=2, position = position_dodge(dodgex))+
+       scale_colour_manual(values = rev(c("#C16666", "#3d0000")))+
+   theme(legend.position = "none")+
+   xlab("Odds ratio (log2)")+
+  scale_y_discrete(limits = rev(levels(subset$var)))
+p2x
+
+p3x <- ggplot(pepval[!pepval$Type == "Incident diabetes (logistic)" & 
+                      !is.na(pepval$HR) & 
+                      !pepval$Group %in%  c("QMDiab","Beijer"),], aes(x=HR, y=var, col=Group, shape=Symbol))+
+  geom_point(position = position_dodge(dodgex), size=2)+
+ # facet_grid(var~Type,scale="free")+
+  geom_vline(xintercept = 1, lty=2, col="#A4A4A4")+
+  geom_errorbarh(aes(xmin=Lower, xmax=Upper), position = position_dodge(dodgex), height=.5)+
+  scale_x_continuous(trans="log2", breaks=c(0.75,1, 1.5,2,4), limits=c(0.5,10))+
+  geom_point(data = plotdata[which(plotdata$Lower == 0.65),], aes(x=Lower, y=var),position = position_dodge(dodgex), pch="<")+
+  geom_point(data = plotdata[which(plotdata$Upper == 2),], aes(x=Upper, y=var),position = position_dodge(dodgex), pch=">")+
+  scale_shape_manual(values = c(16,18))+
+  geom_text(aes(x=7.5, y=var, label=label), col="black", size=2, position = position_dodge(width = .2))+
+    scale_colour_manual(values = rev(c("#990000","#6b0000","#3d0000")))+
+  theme(legend.position = "none")+
+  xlab("Odds ratio (log2)")+
+  scale_y_discrete(limits = rev(levels(subset$var)))
+
+
+
+pdf("./000.Final_Scripts/008.Validation/Peptide_onlyMeta_validation_external.pdf", width=12, height=5)
+p1x+p2x+p3x
+dev.off()
+```
+
+
+
+
+
+
+## Model 2 HbA1c, age, sex, bmi, hdl , cpeptide
+
+```{r CombineModel2}
+load("./000.Final_Scripts/001.CoxModels.Data/DCS_Peptides_CoxModel_2.RData")
+load("./000.Final_Scripts/001.CoxModels.Data/GODARTS_Peptides_CoxModel_2.RData")
+
+##MATCH##
+tmp <- c(as.character(PeptidesModel2DCS$variable),as.character(PeptidesModel2GODARTS$variable))
+tmp <- tmp[duplicated(tmp)]
+DCS_Peptides_Model_2 <- PeptidesModel2DCS[match(tmp,PeptidesModel2DCS$variable),]
+GODARTS_Peptides_Model_2 <- PeptidesModel2GODARTS[match(tmp,PeptidesModel2GODARTS$variable),]
+
+
+
+Combined_Peptides_Model_2 <- CombineCox(Data01 = DCS_Peptides_Model_2,
+                                       Data02 = GODARTS_Peptides_Model_2,
+                                       ColVar = "variable",
+                                       studyLabels = c("DCS","GoDARTS"))
+
+conversion_Model_2<- conversion[match(Combined_Peptides_Model_2$var,conversion$SomaId),]
+Combined_Peptides_Model_2$Target <- conversion_Model_2$Target
+knitr::kable(head(Combined_Peptides_Model_2,20))
+save(Combined_Peptides_Model_2,file="Combined_Peptides_CoxModel_2.RData")
+rio::export(Combined_Peptides_Model_2, file="Combined_Peptides_Model_2.xlsx")
+```
+
+```{r,eval=FALSE,echo=FALSE, fig.width=9, fig.height=2.5}
+getForestPlotHR_Two(Data01 = DCS_Peptides_Model_2,
+                Data02 = GODARTS_Peptides_Model_2,
+                Meta = Combined_Peptides_Model_2,
+                variable ="SL010388")
+
+getForestPlotHR_Two(Data01 = DCS_Peptides_Model_2,
+                Data02 = GODARTS_Peptides_Model_2,
+                Meta = Combined_Peptides_Model_2,
+                variable ="SL004605")
+```
+
+
+## Model 3
+HbA1c, age, sex, bmi, hdl , cpeptide,diabetes duration,glucose lowering drugs
+```{r CombineModel3}
+load("./000.Final_Scripts/001.CoxModels.Data/DCS_Peptides_CoxModel_3.RData")
+load("./000.Final_Scripts/001.CoxModels.Data/GODARTS_Peptides_CoxModel_3.RData")
+##MATCH##
+tmp <- c(as.character(PeptidesModel3DCS$variable),as.character(PeptidesModel3GODARTS$variable))
+tmp <- tmp[duplicated(tmp)]
+DCS_Peptides_Model_3 <- PeptidesModel3DCS[match(tmp,PeptidesModel3DCS$variable),]
+GODARTS_Peptides_Model_3 <- PeptidesModel3GODARTS[match(tmp,PeptidesModel3GODARTS$variable),]
+
+
+
+Combined_Peptides_Model_3 <- CombineCox(Data01 = DCS_Peptides_Model_3,
+                                       Data02 = GODARTS_Peptides_Model_3,
+                                       ColVar = "variable",
+                                       studyLabels = c("DCS","GoDARTS"))
+conversion_Model_3 <- conversion[match(Combined_Peptides_Model_3$var,conversion$SomaId),]
+Combined_Peptides_Model_3$Target <- conversion_Model_3$Target
+knitr::kable(head(Combined_Peptides_Model_3,10))
+save(Combined_Peptides_Model_3,file="Combined_Peptides_CoxModel_3.RData")
+```
+
+
+```{r,eval=FALSE,echo=FALSE, fig.width=9, fig.height=2.5}
+getForestPlotHR_Two(Data01 = DCS_Peptides_Model_3,
+                Data02 = GODARTS_Peptides_Model_3,
+                Meta = Combined_Peptides_Model_3,
+                variable ="SL012774")
+getForestPlotHR_Two(Data01 = DCS_Peptides_Model_3,
+                Data02 = GODARTS_Peptides_Model_3,
+                Meta = Combined_Peptides_Model_3,
+                variable ="SL010388")
+getForestPlotHR_Two(Data01 = DCS_Peptides_Model_3,
+                Data02 = GODARTS_Peptides_Model_3,
+                Meta = Combined_Peptides_Model_3,
+                variable ="SL000603")
+```
+
