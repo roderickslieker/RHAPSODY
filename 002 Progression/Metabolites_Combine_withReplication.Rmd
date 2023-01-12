@@ -1,0 +1,485 @@
+---
+title: "Combine Metabolites"
+author: "Roderick Slieker/ Gerard Bouland"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document:
+    toc: true 
+    toc_depth: 4
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_knit$set(root.dir = "D:/001_Projects/001_RHAPSODY/")
+setwd("D:/001_Projects/001_RHAPSODY/")
+```
+
+
+```{r setup2, include=FALSE, message=F, echo=F}
+library(survminer)
+library(survival)
+library(reshape2)
+library(viridis)
+library(ggplot2)
+library(NMF)
+library(meta)
+library(plotly)
+library(tidyverse)
+library(GGally)
+knitr::opts_chunk$set(echo = TRUE)
+load("./002.Data/Conversion_Peptides.RData")
+source("./000.Final_Scripts/003.Utils/Utils_CoxModels.R")
+source("./000.Final_Scripts/003.Utils/forestplot.R")
+```
+
+## Model 1
+
+HbA1c, age, sex, bmi
+
+```{r, echo=F}
+load("./000.Final_Scripts/001.CoxModels.Data/DCS_Metabolites_CoxModel_1_adjusted_disc.RData")
+
+load("./000.Final_Scripts/001.CoxModels.Data/GoDARTS_Metabolites_CoxModel_1_adjusted_disc.RData")
+load("./000.Final_Scripts/001.CoxModels.Data/GoDARTS_Metabolites_CoxModel_1_adjusted_repl.RData")
+
+load("./000.Final_Scripts/001.CoxModels.Data/ANDIS_Metabolites_CoxModel_1_adjusted_disc.RData")
+load("./000.Final_Scripts/001.CoxModels.Data/ANDIS_Metabolites_CoxModel_1_adjusted_repl.RData")
+```
+
+```{r, echo=F}
+tmp <- c(as.character(MetabolomicsModel1dcs.disc$variable),
+         as.character(MetabolomicsModel1andis.disc$variable),
+         as.character(MetabolomicsModel1andis.repl$variable), 
+         as.character(MetabolomicsModel1godarts.disc$variable), 
+         as.character(MetabolomicsModel1godarts.repl$variable))
+tmp <- names(table(tmp)[table(tmp) == 5])
+
+#DCS
+DCS_Metabol_Model_1 <- MetabolomicsModel1dcs.disc[match(tmp,MetabolomicsModel1dcs.disc$variable),]
+DCS_Metabol_Model_2 <- MetabolomicsModel2dcs.disc[match(tmp,MetabolomicsModel2dcs.disc$variable),]
+DCS_Metabol_Model_3 <- MetabolomicsModel3dcs.disc[match(tmp,MetabolomicsModel3dcs.disc$variable),]
+
+#GoDARTS
+GoDARTS_Metabol_Model_1.1 <- MetabolomicsModel1godarts.disc[match(tmp,MetabolomicsModel1godarts.disc$variable),]
+GoDARTS_Metabol_Model_1.2 <- MetabolomicsModel1godarts.repl[match(tmp,MetabolomicsModel1godarts.repl$variable),]
+
+GoDARTS_Metabol_Model_2.1 <- MetabolomicsModel2godarts.disc[match(tmp,MetabolomicsModel2godarts.disc$variable),]
+GoDARTS_Metabol_Model_2.2 <- MetabolomicsModel2godarts.repl[match(tmp,MetabolomicsModel2godarts.repl$variable),]
+
+GoDARTS_Metabol_Model_3.1 <- MetabolomicsModel3godarts.disc[match(tmp,MetabolomicsModel3godarts.disc$variable),]
+GoDARTS_Metabol_Model_3.2 <- MetabolomicsModel3godarts.repl[match(tmp,MetabolomicsModel3godarts.repl$variable),]
+
+#ANDIS
+ANDIS_Metabol_Model_1.1 <- MetabolomicsModel1andis.disc[match(tmp,MetabolomicsModel1andis.disc$variable),]
+ANDIS_Metabol_Model_1.2 <- MetabolomicsModel1andis.repl[match(tmp,MetabolomicsModel1andis.repl$variable),]
+
+ANDIS_Metabol_Model_2.1 <- MetabolomicsModel2andis.disc[match(tmp,MetabolomicsModel2andis.disc$variable),]
+ANDIS_Metabol_Model_2.2 <- MetabolomicsModel2andis.repl[match(tmp,MetabolomicsModel2andis.repl$variable),]
+
+ANDIS_Metabol_Model_3.1 <- MetabolomicsModel3andis.disc[match(tmp,MetabolomicsModel3andis.disc$variable),]
+ANDIS_Metabol_Model_3.2 <- MetabolomicsModel3andis.repl[match(tmp,MetabolomicsModel3andis.repl$variable),]
+```
+
+### Plots
+
+```{r, echo=F}
+pd <- data.frame(
+  DCS = DCS_Metabol_Model_1$hr,
+  GoDARTS_b1 = GoDARTS_Metabol_Model_1.1$hr,
+  GoDARTS_b2 = GoDARTS_Metabol_Model_1.2$hr,
+  ANDIS_b1 = ANDIS_Metabol_Model_1.1$hr,
+  ANDIS_b2 = ANDIS_Metabol_Model_1.2$hr
+  
+)
+
+# define new log10 functions
+log10_diagonal <- function(data, mapping, ...) {
+  ggally_densityDiag(data, mapping, ...) + scale_x_log10()
+}
+log10_points <- function(data, mapping, ...) {
+  ggally_points(data, mapping, ...) + scale_x_log10() + scale_y_log10() + geom_smooth(method=lm)+
+    geom_vline(xintercept = 1)+
+    geom_hline(yintercept = 1)
+}
+log10_cor <- function(data, mapping, ...) {
+  # preprocess the data for the correlation calculations
+  data[[deparse(mapping$x)]] <- log10(data[[deparse(mapping$x)]])
+  data[[deparse(mapping$y)]] <- log10(data[[deparse(mapping$y)]])
+  
+  ggally_cor(data, mapping, ...) + # grids will not match. hide them
+    theme(
+      panel.grid.major = element_blank(), 
+      panel.border = element_rect(color = "black", fill = NA)
+    )
+}
+```
+
+```{r, echo=F, message=F, results=F, warning=F}
+GGally::ggpairs(pd,   lower = list(continuous = log10_points),)
+```
+
+### Meta-analysis
+
+```{r, echo=F}
+
+# Model 1
+Combined_Metabol_Model_1 <- CombineCoxThree(Data01 = DCS_Metabol_Model_1,
+                                       Data02 = GoDARTS_Metabol_Model_1.1,
+                                       Data03 = ANDIS_Metabol_Model_1.1,
+                                       ColVar = "variable",
+                                       studyLabels = c("DCS","GoDARTS_disc","ANDIS_disc"))
+
+save(Combined_Metabol_Model_1, file="D:/001_Projects/033_RHAPSODY_Shiny/PrepData/Metabolites.m1.RData")
+
+Combined_Metabol_Model_1_var <- CombineCoxTwo(Data01 = GoDARTS_Metabol_Model_1.2,
+                                              Data02 = ANDIS_Metabol_Model_1.2,
+                                              ColVar = "variable",
+                                              studyLabels = c("GoDARTS_repl","ANDIS_repl"))
+
+
+# Model 2
+Combined_Metabol_Model_2 <- CombineCoxThree(Data01 = DCS_Metabol_Model_2,
+                                       Data02 = GoDARTS_Metabol_Model_2.1,
+                                       Data03 = ANDIS_Metabol_Model_2.1,
+                                       ColVar = "variable",
+                                       studyLabels = c("DCS","GoDARTS_disc","ANDIS_disc"))
+
+
+
+Combined_Metabol_Model_2_var <- CombineCoxTwo(Data01 = GoDARTS_Metabol_Model_2.2,
+                                              Data02 = ANDIS_Metabol_Model_2.2,
+                                              ColVar = "variable",
+                                              studyLabels = c("GoDARTS_repl","ANDIS_repl"))
+
+# Model 3
+Combined_Metabol_Model_3 <- CombineCoxThree(Data01 = DCS_Metabol_Model_3,
+                                       Data02 = GoDARTS_Metabol_Model_3.1,
+                                       Data03 = ANDIS_Metabol_Model_3.1,
+                                       ColVar = "variable",
+                                       studyLabels = c("DCS","GoDARTS_disc","ANDIS_disc"))
+
+
+
+Combined_Metabol_Model_3_var <- CombineCoxTwo(Data01 = GoDARTS_Metabol_Model_3.2,
+                                              Data02 = ANDIS_Metabol_Model_3.2,
+                                              ColVar = "variable",
+                                              studyLabels = c("GoDARTS_repl","ANDIS_repl"))
+``` 
+
+## Recalculate CIs
+
+```{r}
+#View(Combined_Metabol_Model_1)
+nsign <- sum(Combined_Metabol_Model_1$fdr.random <= 0.05)
+
+CI <- (1-((0.05*nsign)/nrow(Combined_Metabol_Model_1)))
+
+
+cis.new <- ci(TE = log(Combined_Metabol_Model_1$Effect.random), seTE = Combined_Metabol_Model_1$SE.random, level=CI, df=NULL, null.effect = 0)
+
+Combined_Metabol_Model_1$Adj.low <- exp(cis.new$lower)
+Combined_Metabol_Model_1$Adj.high <- exp(cis.new$upper)
+```
+
+## Export
+
+```{R}
+
+rio::export(Combined_Metabol_Model_1, file="./000.Final_Scripts/001.CoxModels.Combine/Metabolomics_Model1_Threecohorts.xlsx")
+rio::export(Combined_Metabol_Model_1_var, file="./000.Final_Scripts/001.CoxModels.Combine/Metabolomics_Model1_Three_replication_cohorts.xlsx")
+
+rio::export(Combined_Metabol_Model_2, file="./000.Final_Scripts/001.CoxModels.Combine/Metabolomics_Model2_Threecohorts.xlsx")
+rio::export(Combined_Metabol_Model_2_var, file="./000.Final_Scripts/001.CoxModels.Combine/Metabolomics_Model2_Three_replication_cohorts.xlsx")
+
+rio::export(Combined_Metabol_Model_3, file="./000.Final_Scripts/001.CoxModels.Combine/Metabolomics_Model3_Threecohorts.xlsx")
+rio::export(Combined_Metabol_Model_3_var, file="./000.Final_Scripts/001.CoxModels.Combine/Metabolomics_Model3_Three_replication_cohorts.xlsx")
+```
+
+
+## Overwrite CIs
+
+```{r}
+Combined_Metabol_Model_1$lower <- Combined_Metabol_Model_1$Adj.low
+Combined_Metabol_Model_1$upper <- Combined_Metabol_Model_1$Adj.high
+
+Combined_Metabol_Model_1 <- Combined_Metabol_Model_1[,-c(11,12)]
+```
+
+## Update models and select significant 
+
+```{r}
+vars.m1 <- Combined_Metabol_Model_1[Combined_Metabol_Model_1$Pval.random <= 0.1,]$var %>% as.character()
+temp <- Combined_Metabol_Model_1[Combined_Metabol_Model_1$var %in% vars.m1,]
+vars.m1 <- temp[order(temp$Effect.random, decreasing = T),]$var
+
+
+Combined_Metabol_Model_1s <- Combined_Metabol_Model_1[match(vars.m1, Combined_Metabol_Model_1$var),]
+Combined_Metabol_Model_2s <- Combined_Metabol_Model_2[match(vars.m1, Combined_Metabol_Model_2$var),]
+Combined_Metabol_Model_3s <- Combined_Metabol_Model_3[match(vars.m1, Combined_Metabol_Model_3$var),]
+
+Combined_Metabol_Model_1s$Group <- "Meta (discovery)"
+Combined_Metabol_Model_2s$Group <- "Discovery (m2)"
+Combined_Metabol_Model_3s$Group <- "Discovery (m3)"
+
+
+Combined_Metabol_Model_1s_var <- Combined_Metabol_Model_1_var[match(vars.m1, Combined_Metabol_Model_1_var$var),]
+Combined_Metabol_Model_2s_var <- Combined_Metabol_Model_2_var[match(vars.m1, Combined_Metabol_Model_2_var$var),]
+Combined_Metabol_Model_3s_var <- Combined_Metabol_Model_3_var[match(vars.m1, Combined_Metabol_Model_3_var$var),]
+
+Combined_Metabol_Model_1s_var$Group <- "Meta (replication)"
+Combined_Metabol_Model_2s_var$Group <- "Replication (m2)"
+Combined_Metabol_Model_3s_var$Group <- "Replication (m3)"
+```
+
+## Add cohort data
+
+```{r}
+discovery.data.b <- rbind(
+  addCohort(vars = vars.m1, data = DCS_Metabol_Model_1, group = "DCS (disc)"),
+  addCohort(vars = vars.m1, data = GoDARTS_Metabol_Model_1.1, group = "GoDARTS (disc)"),
+  addCohort(vars = vars.m1, data = ANDIS_Metabol_Model_1.1, group = "ANDIS (disc)")
+)
+
+replication.data.b <- rbind(
+  addCohort(vars = vars.m1, data = GoDARTS_Metabol_Model_1.2, group = "GoDARTS (repl)"),
+  addCohort(vars = vars.m1, data = ANDIS_Metabol_Model_1.2, group = "ANDIS (repl)")
+)
+
+discovery.data.b$Type <- "Cox (time to insulin)"
+replication.data.b$Type <- "Cox (time to insulin)"
+
+discovery.data <- updateData(Combined_Metabol_Model_1s)
+discovery.data_var <- updateData(Combined_Metabol_Model_1s_var)
+
+discovery.data.c <- rbind(discovery.data,discovery.data.b,replication.data.b, discovery.data_var)
+discovery.data.c$Shape <- "Cohorts"
+```
+
+## DESIR
+
+```{r}
+DESIR <- rio::import("./000.Final_Scripts/008.Validation/RHAPSODY_DESIR.XLSX", sheet=2)
+DESIR <- DESIR[,c("FDB.name","HR","Lower","Upper","p.value","case_status")]
+colnames(DESIR) <- c("var","HR","Lower","Upper","P-value","Group")
+DESIR <- DESIR[DESIR$var %in% vars.m1, ]
+DESIR$Type <- "Logistic (incident diabetes)"
+DESIR$Shape <- "Cohorts"
+newvars <- c(vars.m1[vars.m1 %in% DESIR$var], vars.m1[!vars.m1 %in% DESIR$var])
+
+```
+
+## MDC
+
+```{r}
+MDC <- rio::import("./000.Final_Scripts/008.Validation/MDC_rhapsody_metabolites.xlsx", sheet=1)
+MDC <- MDC[,c("FDB.name","HR","Lower","Upper","Pvalue","Group")]
+colnames(MDC) <- c("var","HR","Lower","Upper","P-value","Group")
+MDC <- MDC[MDC$var %in% newvars, ]
+MDC$Type <- "Cox (incident diabetes)"
+MDC$Shape <- "Cohorts"
+mdc.gluc.reex <- rio::import("./000.Final_Scripts/008.Validation/MDC_rhapsody_metabolites.xlsx", sheet=2)
+mdc.gluc.2h <- rio::import("./000.Final_Scripts/008.Validation/MDC_rhapsody_metabolites.xlsx", sheet=3)
+
+mdc.gluc.reex <- mdc.gluc.reex[mdc.gluc.reex$FDB.name %in% vars.m1,]
+mdc.gluc.reex <- mdc.gluc.reex[,c("FDB.name","Beta","lowint","highint","p")]
+mdc.gluc.reex$Group <- "Glucose re-examination"
+colnames(mdc.gluc.reex) <- c("var","HR","Lower","Upper","P-value","Group")
+mdc.gluc.reex$Type <- "Gluc re-exam"
+mdc.gluc.reex$Shape <- "Cohorts"
+mdc.gluc.reex$Group <- "MDC"
+
+mdc.gluc.2h <- mdc.gluc.2h[mdc.gluc.2h$FDB.name %in% vars.m1,]
+mdc.gluc.2h <- mdc.gluc.2h[,c("FDB.name","Beta","lowint","highint","p")]
+mdc.gluc.2h$Group <- "MDC"
+colnames(mdc.gluc.2h) <- c("var","HR","Lower","Upper","P-value","Group")
+mdc.gluc.2h$Type <- "2-hr Gluc"
+mdc.gluc.2h$Shape <- "Cohorts"
+
+mdc <- rbind(MDC, mdc.gluc.reex, mdc.gluc.2h)
+
+```
+
+## Validation
+
+```{r}
+plotdata <- rbind(discovery.data.c)
+plotdata$var <- factor(as.character(plotdata$var), levels=vars.m1)
+
+validation <- rbind(DESIR, mdc)
+validation$var <- factor(as.character(validation$var), levels=vars.m1)
+validation$Type <- factor(validation$Type, levels=c("Cox (incident diabetes)","Logistic (incident diabetes)","Gluc re-exam","2-hr Gluc"))
+```
+
+```{r}
+dodgex <- 1
+plotdata$Type <- factor(plotdata$Type, levels=c("Cox (time to insulin)", "Cox (incident diabetes)","Logistic (incident diabetes)"))
+
+levels.groups <- c("DCS (disc)", "GoDARTS (disc)", "ANDIS (disc)","Meta (discovery)",
+  "GoDARTS (repl)", "ANDIS (repl)", "Meta (replication)")
+
+plotdata$Group <- factor(plotdata$Group, levels=rev(levels.groups))
+library(patchwork)
+
+#load("./000.Final_Scripts/008.Validation/Plots_density.RData")
+
+plotdata$Lower.new <- ifelse(plotdata$Lower <= 0.65, 0.65, plotdata$Lower)
+plotdata$Upper.new <- ifelse(plotdata$Upper >= 1.6, 1.6, plotdata$Upper)
+plotdata$Symbol <- ifelse(plotdata$Group %in% c("Meta (discovery)","Meta (replication)"),"Summary","Single")
+plotdata$var <- factor(as.character(plotdata$var), levels=vars.m1)
+
+
+plotdata$label <- sprintf("%s [%s,%s]", format(round(plotdata$HR,2), nsmall=2),
+                          format(round(plotdata$Lower,2), nsmall=2),
+                          format(round(plotdata$Upper,2), nsmall=2))
+
+validation$label <- sprintf("%s [%s,%s]", format(round(validation$HR,2), nsmall=2),
+                          format(round(validation$Lower,2), nsmall=2),
+                          format(round(validation$Upper,2), nsmall=2))
+
+
+rio::export(plotdata, file="SourceData.Figure1.Panel.left.xlsx")
+
+p.hr <- 
+  ggplot(plotdata, aes(x=HR, y=Group, col=Group, shape=Symbol))+
+  geom_vline(xintercept = 1, lty=2, col="#A4A4A4")+
+  geom_point(position = position_dodge(dodgex))+
+  facet_grid(var~Type,scale="free", space="free_y")+
+  geom_errorbarh(aes(xmin=Lower.new, xmax=Upper.new), position = position_dodge(dodgex), height=.5)+
+  scale_x_continuous(trans="log2", breaks=c(0.75,1, 1.5,2), limits=c(0.65,3))+
+  geom_point(data = plotdata[which(plotdata$Lower.new == 0.65),], aes(x=Lower, y=Group),position = position_dodge(dodgex), pch="<")+
+  geom_point(data = plotdata[which(plotdata$Upper.new == 1.6),], aes(x=Upper, y=Group),position = position_dodge(dodgex), pch=">")+
+  scale_shape_manual(values = c(16,18))+
+  geom_text(aes(x=1.75, y=Group, label=label), col="black", size=3, hjust = 0)+
+    scale_colour_manual(values = rev(c("#f0a500","#007944","#ff847c","#e84a5f","#009Ac7","#162447","#A4A4A4")))
+
+p.hr
+
+rio::export(validation[!validation$Group %in% "MDC",], file="SourceData.Figure1.Panel.right.xlsx")
+
+
+p.desir <- 
+  ggplot(validation[!validation$Group %in% "MDC",], aes(x=HR, y=Group, col=Group))+
+  geom_vline(xintercept = 1, lty=2, col="#A4A4A4")+
+  geom_point(position = position_dodge(dodgex))+
+  facet_grid(var~Type,scale="free", space="free_y")+
+  geom_errorbarh(aes(xmin=Lower, xmax=Upper), position = position_dodge(dodgex), height=.5)+
+  scale_x_continuous(trans="log2", limits=c(.05,50000), breaks=c(0.25,5,100))+
+  scale_colour_manual(values = viridis::viridis_pal()(7))+
+  geom_text(aes(x=700, y=Group, label=label), col="black", size=3, hjust = 0)+
+  theme(legend.position = "none")
+
+rio::export(validation[validation$Group %in% "MDC" & validation$Type %in% "Cox (incident diabetes)",], file="SourceData.Figure1.Panel.middle.xlsx")
+
+p.mdc <- 
+  ggplot(validation[validation$Group %in% "MDC" & validation$Type %in% "Cox (incident diabetes)",], aes(x=HR, y=Group, col=Group))+
+  geom_vline(xintercept = 1, lty=2, col="#A4A4A4")+
+  geom_point(position = position_dodge(dodgex))+
+  facet_grid(var~Type,scale="free", space="free_y")+
+  geom_errorbarh(aes(xmin=Lower, xmax=Upper), position = position_dodge(dodgex), height=.5)+
+  scale_x_continuous(trans="log2", breaks=c(0.75,1, 2), limits=c(0.65,15))+
+  geom_text(aes(x=2, y=Group, label=label), col="black", size=3, hjust = 0)+
+  scale_colour_manual(values = viridis::viridis_pal()(7))+
+  theme(legend.position = "none")
+
+p.mdc2 <- 
+  ggplot(validation[validation$Group %in% "MDC" & !validation$Type %in% "Cox (incident diabetes)",], aes(x=HR, y=Group, col=Group))+
+  geom_vline(xintercept = 0, lty=2, col="#A4A4A4")+
+  geom_point(position = position_dodge(dodgex))+
+  facet_grid(var~Type,scale="free", space="free_y")+
+  geom_errorbarh(aes(xmin=Lower, xmax=Upper), position = position_dodge(dodgex), height=.5)+
+  scale_x_continuous(limits=c(-1,2.5), breaks=c(-.2,0,.4))+
+  geom_text(aes(x=.5, y=Group, label=label), col="black", size=3, hjust = 0)+
+  scale_colour_manual(values = viridis::viridis_pal()(7))+
+  theme(legend.position = "none")
+```
+
+### Subset
+
+```{r}
+subdata <- plotdata[plotdata$Group %in% c("Meta (discovery)","Meta (replication)"),]
+subdata$var <- factor(as.character(subdata$var), levels=rev(levels(subdata$var)))
+subdata <- subdata[subdata$var %in% c("Hcit","AADA","Ile","GCA","TCA"),]
+validation$var <- factor(validation$var, levels=levels(subdata$var))
+
+p.hr.sub <- 
+  ggplot(subdata, aes(x=HR, y=var, col=Group, shape=Symbol))+
+  geom_vline(xintercept = 1, lty=2, col="#A4A4A4")+
+  geom_point(position = position_dodge(dodgex))+
+  #facet_grid(var~Type,scale="free", space="free_y")+
+  geom_errorbarh(aes(xmin=Lower.new, xmax=Upper.new), position = position_dodge(dodgex), height=.5)+
+  scale_x_continuous(trans="log2", breaks=c(0.75,1, 1.5,2), limits=c(0.65,3))+
+  geom_point(data = plotdata[which(plotdata$Lower.new == 0.65),], aes(x=Lower, y=var),position = position_dodge(dodgex), pch="<")+
+  geom_point(data = plotdata[which(plotdata$Upper.new == 1.6),], aes(x=Upper, y=var, col=Group),position = position_dodge(dodgex), pch=">")+
+  scale_shape_manual(values = c(16,18))+
+  geom_text(aes(x=1.75, y=var, label=label, group=Group), col="black", position = position_dodge(dodgex), size=3, hjust = 0)+
+    scale_colour_manual(values = rev(c("#f0a500","#007944","#ff847c","#e84a5f","#009Ac7","#162447","#A4A4A4")))+
+  theme(legend.position = "none")+
+  ylab("Metabolite")+
+  xlab("Hazard ratio (log2)")+
+  ggtitle("Discovery")
+p.hr.sub
+```
+
+```{r}
+pdf("./000.Final_Scripts/008.Validation/Metabolites_onlyMeta.pdf", height=3, width=4)
+p.hr.sub
+dev.off()
+```
+
+
+```{r}
+p.hr + p.mdc +  p.desir + plot_layout(ncol=4, width=c(0.75,0.75,0.75))
+```
+
+```{r}
+pdf("./000.Final_Scripts/008.Validation/Metabolomic_figure validation.pdf", width=12,height=7)
+p.hr + p.mdc +  p.desir + plot_layout(ncol=3, width=c(1.25,0.75,0.75))
+dev.off()
+```
+
+
+
+
+### Subset
+
+```{r}
+subdata <- plotdata[!plotdata$Group %in% "Meta (replication)",]
+subdata$newGroup <- "Discovery"
+subdata[grep("repl",subdata$Group),]$newGroup <- "Validation"
+subdata$var <- factor(as.character(subdata$var), levels=rev(levels(subdata$var)))
+sub.val <- subdata[subdata$newGroup == "Validation",]
+
+p.hr.sub <- 
+  ggplot(subdata[subdata$newGroup == "Discovery",], aes(x=HR, y=Group, col=Group, shape=Symbol))+
+  geom_vline(xintercept = 1, lty=2, col="#A4A4A4")+
+  geom_point(position = position_dodge(dodgex))+
+  facet_grid(var~.,scale="free")+
+  geom_errorbarh(aes(xmin=Lower.new, xmax=Upper.new), position = position_dodge(dodgex), height=.5)+
+  scale_x_continuous(trans="log2", breaks=c(0.75,1, 1.5,2), limits=c(0.65,3))+
+  geom_point(data = subdata[which(subdata$Lower.new == 0.65),], aes(x=Lower, y=Group),position = position_dodge(dodgex), pch="<")+
+  geom_point(data = subdata[which(subdata$Upper.new == 1.6),], aes(x=Upper, y=Group),position = position_dodge(dodgex), pch=">")+
+  scale_shape_manual(values = c(16,18))+
+  geom_text(aes(x=1.75, y=Group, label=label), col="black", size=3, hjust = 0)+
+    scale_colour_manual(values = rev(c("#f0a500","#007944","#ff847c","#e84a5f","#009Ac7","#162447","#A4A4A4")))+
+  theme(legend.position = "none")+
+  ylab("Metabolite")+
+  ggplot(sub.val, aes(x=HR, y=Group, col=Group, shape=Symbol))+
+  geom_vline(xintercept = 1, lty=2, col="#A4A4A4")+
+  geom_point(position = position_dodge(dodgex))+
+  facet_grid(var~.,scale="free_y")+
+  geom_errorbarh(aes(xmin=Lower.new, xmax=Upper.new), position = position_dodge(dodgex), height=.5)+
+  scale_x_continuous(trans="log2", breaks=c(0.75,1, 1.5,2), limits=c(0.65,3))+
+  geom_point(data = sub.val[which(sub.val$Lower.new == 0.65),], aes(x=Lower, y=Group),position = position_dodge(dodgex), pch="<")+
+  geom_point(data = sub.val[which(sub.val$Upper.new == 1.6),], aes(x=Upper, y=Group),position = position_dodge(dodgex), pch=">")+
+  scale_shape_manual(values = c(16,18))+
+  geom_text(aes(x=1.75, y=Group, label=label), col="black", size=3, hjust = 0)+
+    scale_colour_manual(values = rev(c("#009Ac7","#162447")))+
+  theme(legend.position = "none")+
+  ylab("Metabolite")
+p.hr.sub
+
+
+pdf("./000.Final_Scripts/008.Validation/Metabolites_BB.pdf", height=6, width=9)
+p.hr.sub
+dev.off()
+```
