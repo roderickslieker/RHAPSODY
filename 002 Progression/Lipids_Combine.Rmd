@@ -1,0 +1,526 @@
+---
+title: "Combine Lipids"
+author: "Gerard Bouland / Roderick Slieker"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE, message=F}
+knitr::opts_knit$set(root.dir = "D:/001_Projects/001_RHAPSODY/")
+setwd("D:/001_Projects/001_RHAPSODY/")
+```
+## Packages
+
+```{r}
+library(survminer)
+library(survival)
+library(reshape2)
+library(viridis)
+library(ggplot2)
+library(forestplot)
+library(NMF)
+library(patchwork)
+library(meta)
+```
+
+```{r}
+source("./000.Final_Scripts/003.Utils/forestplot.R")
+source("./000.Final_Scripts/003.Utils/Utils_CoxModels.R")
+```
+
+```{r PlotFunction, echo=FALSE}
+get.plot <- function(dataDCS, dataGODARTS, title, cohortLabels, ymin, ymax, xmin, xmax, cols)
+{
+  pd <- data.frame(Beta.DCS = dataDCS$hr, Beta.GoDARTS = dataGODARTS$hr)
+  pd$Sign <- ifelse(dataDCS$fdr <= 0.05 & dataGODARTS$fdr <= 0.05, "Sign", "NonSign")
+  pd$class <- cols
+  
+  pd$label <- ifelse(pd$Sign == "Sign", NA, NA)
+  
+  minx <- round(min(c(pd$Beta.DCS, pd$Beta.GoDARTS)), 1)
+  maxx <- round(max(c(pd$Beta.DCS, pd$Beta.GoDARTS)), 1)
+  
+  P <- ggplot(pd, aes(x=Beta.DCS, y=Beta.GoDARTS, label=label, col=class))+
+    geom_point()+
+    geom_text()+
+    scale_colour_manual(values = viridis::viridis_pal()(length(unique(cols))))+
+    xlab(paste("Estimate",cohortLabels[1]))+
+    ylab(paste("Estimate",cohortLabels[2]))+
+    ggtitle(title)+
+    geom_smooth(method=lm, col='black')+
+    geom_vline(xintercept = 1)+
+    geom_hline(yintercept = 1)+
+    xlim(xmin, xmax)+ylim(ymin, ymax)
+
+  return(P)
+}
+```
+
+```{r CombineCoxmodels, echo=FALSE}
+CombineCox <- function(Data01, Data02, Data03, ColVar, studyLabels){
+  #Check if dataframes have equal number of rows
+  if(!nrow(Data01) == nrow(Data02)){
+    stop("Dataframes are not of equal length")
+  }
+  #Check if variables are equal and in same order
+  if(!table(as.character(Data01[,ColVar]) == as.character(Data02[,ColVar]))==nrow(Data01)){
+    stop("Variables of dataframes are not in same order")
+  }
+  if(!table(as.character(Data01[,ColVar]) == as.character(Data03[,ColVar]))==nrow(Data01)){
+    stop("Variables of dataframes are not in same order")
+  }
+  
+  combined <- data.frame()
+  variables <-as.character(Data01[,ColVar])
+  
+  for(i in seq_along(variables)){
+    var <- variables[i]
+    tmp.merge <- rbind(Data01[Data01[,ColVar] == var,],
+                       Data02[Data02[,ColVar] == var,],
+                       Data03[Data03[,ColVar] == var,])
+    
+    
+    tmp.combined <- metagen(TE = log(tmp.merge$hr),
+                            seTE = tmp.merge$se.hr,
+                            studlab=studyLabels,
+                            comb.fixed = TRUE,
+                            comb.random = TRUE,
+                            sm="HR")
+    cis <- ci(TE = tmp.combined$TE.random, seTE = tmp.combined$seTE.random, level=0.95, df=NULL, null.effect = 0)
+    summ <- data.frame(var,
+                      #Effect.fixed = tmp.combined$TE.fixed,
+                      #SE.fixed = tmp.combined$seTE.fixed,
+                      #Zval.fixed = tmp.combined$zval.fixed,
+                      #Pval.fixed = tmp.combined$pval.fixed,
+                      Effect.random = exp(tmp.combined$TE.random),
+                      SE.random = tmp.combined$seTE.random,
+                      lower = exp(cis$lower),
+                      upper = exp(cis$upper),
+                      Zval.random = tmp.combined$zval.random,
+                      Pval.random  = tmp.combined$pval.random,
+                      I2 = summary(tmp.combined)$I2,
+                      Het = pchisq(tmp.combined$Q,1, lower.tail=F))
+    
+    combined <- rbind(combined,summ)
+  }
+  combined <- combined[order(combined$Pval.random, decreasing=F),]
+  combined$fdr.random <- p.adjust(combined$Pval.random,method="fdr")
+  return(combined)
+}
+```
+
+```{r}
+getOriginal <- function(frames, variable, variableCol,desiredCols){
+  tmp.rows.list <- lapply(frames,function(x){get(x)[get(x)[,variableCol] == variable,desiredCols]})
+  names(tmp.rows.list) <- frames
+  do.call(rbind,tmp.rows.list)
+}
+```
+
+
+```{r,echo=FALSE}
+lipids.classes <- read.table("./002.Data/SwissLipids.csv", sep=",", header=T)
+```
+
+## Model 1 HbA1c, age, sex, bmi
+
+```{r CombineModel1}
+options(stringsAsFactors = FALSE)
+load("./000.Final_Scripts/001.CoxModels.Data/DCS_Lipids_CoxModel_1.RData")
+load("./000.Final_Scripts/001.CoxModels.Data/GODARTS_Lipids_CoxModel_1.RData")
+load("./000.Final_Scripts/001.CoxModels.Data/ANDIS_Lipids_CoxModel_1.RData")
+
+load("./000.Final_Scripts/001.CoxModels.Data/DCS_Lipids_CoxModel_2.RData")
+load("./000.Final_Scripts/001.CoxModels.Data/GODARTS_Lipids_CoxModel_2.RData")
+load("./000.Final_Scripts/001.CoxModels.Data/ANDIS_Lipids_CoxModel_2.RData")
+
+load("./000.Final_Scripts/001.CoxModels.Data/DCS_Lipids_CoxModel_3.RData")
+load("./000.Final_Scripts/001.CoxModels.Data/GODARTS_Lipids_CoxModel_3.RData")
+load("./000.Final_Scripts/001.CoxModels.Data/ANDIS_Lipids_CoxModel_3.RData")
+
+prepareMDC <- function(data)
+{
+  data.out <- data[,c("Target","ExpB","Lower","Upper","Sig")]
+  data.out$Group <- "Cox (incident diabetes)"
+  colnames(data.out) <- c("var","HR","Lower","Upper","P-value","Group")
+  return(data.out)
+}
+
+
+##MATCH##
+tmp <- c(as.character(LiposModel1dcs$variable),as.character(LiposModel1GoDarts$variable),as.character(LiposModel1Andis$variable))
+#tmp <- names(table(tmp)[table(tmp) == 2])
+tmp <- names(table(tmp)[table(tmp) == 3])
+
+DCS_Lipids_Model_1 <- LiposModel1dcs[match(tmp,LiposModel1dcs$variable),]
+GODARTS_Lipids_Model_1 <- LiposModel1GoDarts[match(tmp,LiposModel1GoDarts$variable),]
+ANDIS_Lipids_Model_1 <- LiposModel1Andis[match(tmp,LiposModel1Andis$variable),]
+lipids.classes.Model_1 <- lipids.classes[match(DCS_Lipids_Model_1$variable,lipids.classes$FDBName),]
+
+DCS_Lipids_Model_2 <- LiposModel2dcs[match(tmp,LiposModel2dcs$variable),]
+GODARTS_Lipids_Model_2 <- LiposModel2GoDarts[match(tmp,LiposModel2GoDarts$variable),]
+ANDIS_Lipids_Model_2 <- LiposModel2Andis[match(tmp,LiposModel2Andis$variable),]
+
+DCS_Lipids_Model_3 <- LiposModel3dcs[match(tmp,LiposModel3dcs$variable),]
+GODARTS_Lipids_Model_3 <- LiposModel3GoDarts[match(tmp,LiposModel3GoDarts$variable),]
+ANDIS_Lipids_Model_3 <- LiposModel3Andis[match(tmp,LiposModel3Andis$variable),]
+
+##PLOT##
+p <- get.plot(DCS_Lipids_Model_1,GODARTS_Lipids_Model_1,"Model 1",cohortLabels=c("DCS","GoDARTS"),
+               xmin = 0.6, xmax = 1.4, ymin=0.6, ymax=1.4,col=lipids.classes.Model_1$Class)
+p2 <- get.plot(DCS_Lipids_Model_1,ANDIS_Lipids_Model_1,"Model 1",cohortLabels=c("DCS","Andis"),
+               xmin = 0.6, xmax = 1.4, ymin=0.6, ymax=1.4,col=lipids.classes.Model_1$Class)
+p3 <- get.plot(GODARTS_Lipids_Model_1,ANDIS_Lipids_Model_1,"Model 1",cohortLabels = c("GoDARTS","Andis"),
+               xmin = 0.6, xmax = 1.4, ymin=0.6, ymax=1.4,col=lipids.classes.Model_1$Class)
+print(p)
+print(p2)
+print(p3)
+
+Combined_Lipids_Model_1_with_ANDIS <- CombineCox(Data01 = DCS_Lipids_Model_1,
+                                       Data02 = GODARTS_Lipids_Model_1,
+                                       Data03 = ANDIS_Lipids_Model_1,
+                                       ColVar = "FDBfullname",
+                                       studyLabels = c("DCS","GoDARTS","Andis"))
+
+
+save(Combined_Lipids_Model_1_with_ANDIS, file="D:/001_Projects/033_RHAPSODY_Shiny/PrepData/Lipids.m1.RData")
+
+Combined_Lipids_Model_2_with_ANDIS <- CombineCox(Data01 = DCS_Lipids_Model_2,
+                                       Data02 = GODARTS_Lipids_Model_2,
+                                       Data03 = ANDIS_Lipids_Model_2,
+                                       ColVar = "FDBfullname",
+                                       studyLabels = c("DCS","GoDARTS","Andis"))
+
+
+Combined_Lipids_Model_3_with_ANDIS <- CombineCox(Data01 = DCS_Lipids_Model_3,
+                                       Data02 = GODARTS_Lipids_Model_3,
+                                       Data03 = ANDIS_Lipids_Model_3,
+                                       ColVar = "FDBfullname",
+                                       studyLabels = c("DCS","GoDARTS","Andis"))
+
+``` 
+
+
+
+## Recalculate CIs
+
+```{r}
+nsign <- sum(Combined_Lipids_Model_1_with_ANDIS$fdr.random <= 0.1)
+
+ci <- (1-((0.05*nsign)/nrow(Combined_Lipids_Model_1_with_ANDIS)))
+
+
+cis.new <- ci(TE = log(Combined_Lipids_Model_1_with_ANDIS$Effect.random), seTE = Combined_Lipids_Model_1_with_ANDIS$SE.random, level=ci, df=NULL, null.effect = 0)
+
+Combined_Lipids_Model_1_with_ANDIS$Adj.low <- exp(cis.new$lower)
+Combined_Lipids_Model_1_with_ANDIS$Adj.high <- exp(cis.new$upper)
+```
+
+```{r}
+rio::export(Combined_Lipids_Model_1_with_ANDIS, file="./000.Final_Scripts/001.CoxModels.Combine/Lipidomics_Model1_Threecohorts.xlsx")
+
+rio::export(Combined_Lipids_Model_2_with_ANDIS, file="./000.Final_Scripts/001.CoxModels.Combine/Lipidomics_Model2_Threecohorts.xlsx")
+
+rio::export(Combined_Lipids_Model_3_with_ANDIS, file="./000.Final_Scripts/001.CoxModels.Combine/Lipidomics_Model3_Threecohorts.xlsx")
+```
+
+
+## Overwrite CIs
+
+```{r}
+Combined_Lipids_Model_1_with_ANDIS$lower <- Combined_Lipids_Model_1_with_ANDIS$Adj.low
+Combined_Lipids_Model_1_with_ANDIS$upper <- Combined_Lipids_Model_1_with_ANDIS$Adj.high
+
+Combined_Lipids_Model_1_with_ANDIS <- Combined_Lipids_Model_1_with_ANDIS[,-c(11,12)]
+```
+
+
+
+
+```{r}
+table(Combined_Lipids_Model_1_with_ANDIS$fdr.random <= 0.05)
+
+Sign_model1 <- Combined_Lipids_Model_1_with_ANDIS[Combined_Lipids_Model_1_with_ANDIS$fdr.random < 0.05,"var"]
+knitr::kable(head(Combined_Lipids_Model_1_with_ANDIS,10))
+save(Combined_Lipids_Model_1_with_ANDIS,file="./000.Final_Scripts/001.CoxModels.Combine/Combined_Lipids_CoxModel_1_with_ANDIS.RData")
+```
+
+```{r}
+
+Combined_Lipids_Model_1_with_ANDIS$newvar <- gsub("LBTESTCD.","",Combined_Lipids_Model_1_with_ANDIS$var)
+Combined_Lipids_Model_1_with_ANDIS.s <- Combined_Lipids_Model_1_with_ANDIS[Combined_Lipids_Model_1_with_ANDIS$fdr.random <= 0.05,]
+Combined_Lipids_Model_1_with_ANDIS.s$Group <- "Discovery (m1)"
+
+discovery.data <- updateData(Combined_Lipids_Model_1_with_ANDIS.s)
+vars.m1 <- discovery.data$var[order(discovery.data$HR, decreasing=T)] %>% unique()
+
+discovery.data.b <- rbind(
+  addCohort(vars = vars.m1, data = DCS_Lipids_Model_1, group = "DCS (disc)"),
+  addCohort(vars = vars.m1, data = GODARTS_Lipids_Model_1, group = "GoDARTS (disc)"),
+  addCohort(vars = vars.m1, data = ANDIS_Lipids_Model_1, group = "ANDIS (disc)")
+
+)
+
+
+
+discovery.data.b$Type <- "Cox (time to insulin)"
+discovery.data.b$Shape <- "Cohorts"
+discovery.data$Shape <- "Meta"
+
+discovery.data$var <- gsub("LBTESTCD.","",discovery.data$var)
+```
+
+```{r}
+mdc.lipids <- rio::import("./000.Final_Scripts/008.Validation/Results_190412.xlsx", sheet=1)
+mdc.gluc.reex <- rio::import("./000.Final_Scripts/008.Validation/Results_190412.xlsx", sheet=2)
+mdc.gluc.2h <- rio::import("./000.Final_Scripts/008.Validation/Results_190412.xlsx", sheet=3)
+
+mdc.lipids <- mdc.lipids[mdc.lipids$Target %in% Combined_Lipids_Model_1_with_ANDIS.s$newvar,]
+mdc.lipids <- prepareMDC(mdc.lipids)
+mdc.lipids$Type <- "Cox (incident diabetes)"
+mdc.lipids$Shape <- "Cohorts"
+mdc.lipids$Group <- "MDC"
+```
+
+```{r}
+plotdata <- rbind(discovery.data, discovery.data.b, mdc.lipids)
+plotdata$Type <- factor(plotdata$Type, levels=c("Cox (time to insulin)","Cox (incident diabetes)"))
+
+plotdata$Group <- factor(plotdata$Group,levels=rev(c("DCS (disc)","GoDARTS (disc)", "ANDIS (disc)", "Discovery (m1)","MDC")))
+```
+
+```{r}
+vars.m1 <- gsub("LBTESTCD.","",vars.m1)
+plotdata$var <- factor(plotdata$var, levels=vars.m1)
+dodgex <- 1
+plotdata$label <- sprintf("%s [%s,%s]", format(round(plotdata$HR,2), nsmall=2),
+                          format(round(plotdata$Lower,2), nsmall=2),
+                          format(round(plotdata$Upper,2), nsmall=2))
+
+
+rio::export(plotdata[plotdata$Type == "Cox (time to insulin)",], file="SourceData.Figure2.Panel.left.xlsx")
+
+p1.1 <- ggplot(plotdata[plotdata$Type == "Cox (time to insulin)",], aes(x=HR, y=Group, col=Group, shape=Shape))+
+  geom_vline(xintercept = 1, lty=2, col="#A4A4A4")+
+  geom_point(position = position_dodge(dodgex))+
+  facet_grid(var~Type,scale="free", space="free_y")+
+  geom_errorbarh(aes(xmin=Lower, xmax=Upper), position = position_dodge(dodgex), height=.5)+
+  scale_x_continuous(trans="log2", breaks=c(0.75,1, 1.5,2), limits=c(.6,3))+
+  geom_point(data = plotdata[plotdata$Lower == 0.65,], aes(x=Lower, y=var),position = position_dodge(dodgex), pch="<")+
+  geom_text(aes(x=2, y=Group, label=label), size=2, hjust=0, col="black")+
+  geom_point(data = plotdata[plotdata$Upper == 2,], aes(x=Upper, y=var),position = position_dodge(dodgex), pch=">")+
+  scale_shape_manual(values = c(16,18))+
+    scale_colour_manual(values = c("#f0a500","#e84a5f","#162447","#2E86C1","#1E8449"))+
+  xlab("Hazard ratio")+
+  theme(legend.position = "none")
+
+rio::export(plotdata[!plotdata$Type == "Cox (time to insulin)",], file="SourceData.Figure2.Panel.middle.xlsx")
+
+
+p1.2 <- ggplot(plotdata[!plotdata$Type == "Cox (time to insulin)",], aes(x=HR, y=Group, col=Group, shape=Shape))+
+  geom_vline(xintercept = 1, lty=2, col="#A4A4A4")+
+  geom_point(position = position_dodge(dodgex))+
+  facet_grid(var~Type,scale="free", space="free_y")+
+  geom_errorbarh(aes(xmin=Lower, xmax=Upper), position = position_dodge(dodgex), height=.5)+
+  scale_x_continuous(trans="log2", breaks=c(0.75,1, 1.5,2), limits=c(.6,3))+
+  geom_point(data = plotdata[plotdata$Lower == 0.65,], aes(x=Lower, y=var),position = position_dodge(dodgex), pch="<")+
+  geom_text(aes(x=2, y=Group, label=label), size=2, hjust=0, col="black")+
+  geom_point(data = plotdata[plotdata$Upper == 2,], aes(x=Upper, y=var),position = position_dodge(dodgex), pch=">")+
+  scale_shape_manual(values = c(16,18))+
+    scale_colour_manual(values = c("#f0a500","#e84a5f","#162447","#2E86C1","#1E8449"))+
+  xlab("Hazard ratio")+
+  theme(legend.position = "none")
+```
+
+
+### Subset
+
+```{r}
+subdata <- plotdata[plotdata$Shape %in% "Meta",]
+subdata$var <- factor(as.character(subdata$var), levels=rev(levels(subdata$var)))
+
+
+p.hr.sub <- 
+  ggplot(subdata, aes(x=HR, y=var, col=Group, shape=Shape))+
+  geom_vline(xintercept = 1, lty=2, col="#A4A4A4")+
+  geom_point(position = position_dodge(dodgex))+
+  #facet_grid(var~Type,scale="free", space="free_y")+
+  geom_errorbarh(aes(xmin=Lower, xmax=Upper), position = position_dodge(dodgex), height=.5)+
+  scale_x_continuous(trans="log2", breaks=c(0.75,1, 1.5,2), limits=c(.6,3))+
+  geom_point(data = plotdata[plotdata$Lower == 0.65,], aes(x=Lower, y=var),position = position_dodge(dodgex), pch="<")+
+  geom_text(aes(x=2, y=var, label=label), size=2, hjust=0, col="black")+
+  geom_point(data = plotdata[plotdata$Upper == 2,], aes(x=Upper, y=var),position = position_dodge(dodgex), pch=">")+
+  scale_shape_manual(values = c(16,18))+
+    scale_colour_manual(values = c("#e84a5f","#162447","#2E86C1","#1E8449"))+
+  xlab("Hazard ratio")+
+  theme(legend.position = "none")
+
+subdata2 <- plotdata[plotdata$Group %in% "MDC",]
+subdata2$var <- factor(as.character(subdata2$var), levels=rev(levels(subdata2$var)))
+
+
+p1.2x <- ggplot(subdata2, aes(x=HR, y=var, col=Group, shape=Shape))+
+  geom_vline(xintercept = 1, lty=2, col="#A4A4A4")+
+  geom_point(position = position_dodge(dodgex))+
+  #facet_grid(var~Type,scale="free", space="free_y")+
+  geom_errorbarh(aes(xmin=Lower, xmax=Upper), position = position_dodge(dodgex), height=.5)+
+  scale_x_continuous(trans="log2", breaks=c(0.75,1, 1.5,2), limits=c(.6,3))+
+  geom_point(data = plotdata[plotdata$Lower == 0.65,], aes(x=Lower, y=var),position = position_dodge(dodgex), pch="<")+
+  geom_text(aes(x=2, y=var, label=label), size=2, hjust=0, col="black")+
+  geom_point(data = plotdata[plotdata$Upper == 2,], aes(x=Upper, y=var),position = position_dodge(dodgex), pch=">")+
+  scale_shape_manual(values = c(16,18))+
+    scale_colour_manual(values = c("#f0a500","#e84a5f","#162447","#2E86C1","#1E8449"))+
+  xlab("Hazard ratio")+
+  theme(legend.position = "none")
+
+
+pdf("./000.Final_Scripts/008.Validation/Lipids_onlyMeta.pdf", height=4, width=8)
+p.hr.sub + ylab("") + p1.2x + ylab("")
+dev.off()
+```
+
+
+```{R}
+mdc.lipids$Target[!mdc.lipids$Target %in% Combined_Lipids_Model_1_with_ANDIS$newvar]
+
+table(mdc.lipids$Target %in% Combined_Lipids_Model_1_with_ANDIS$newvar)
+
+head(Combined_Lipids_Model_1_with_ANDIS)
+``` 
+
+```{r,echo=TRUE,eval=TRUE, fig.width=12, fig.height=2.5}
+getForestPlotHR(Data01 =DCS_Lipids_Model_1 ,
+                Data02 =GODARTS_Lipids_Model_1 ,
+                Data03 = ANDIS_Lipids_Model_1 ,
+                Meta = Combined_Lipids_Model_1_with_ANDIS ,
+                variable = "LBTESTCD.TAG.50.1.0")
+getForestPlotHR(Data01 =DCS_Lipids_Model_1 ,
+                Data02 =GODARTS_Lipids_Model_1 ,
+                Data03 = ANDIS_Lipids_Model_1 ,
+                Meta = Combined_Lipids_Model_1_with_ANDIS ,
+                variable = "LBTESTCD.TAG.46.1.0")
+getForestPlotHR(Data01 =DCS_Lipids_Model_1 ,
+                Data02 =GODARTS_Lipids_Model_1 ,
+                Data03 = ANDIS_Lipids_Model_1 ,
+                Meta = Combined_Lipids_Model_1_with_ANDIS ,
+                variable = "LBTESTCD.TAG.46.2.0")
+
+```
+
+## Model 2
+HbA1c, age, sex, bmi, hdl , cpeptide
+```{r CombineModel2}
+load("./000.Final_Scripts/001.CoxModels.Data/DCS_Lipids_CoxModel_2.RData")
+
+load("./000.Final_Scripts/001.CoxModels.Data/GODARTS_Lipids_CoxModel_2.RData")
+
+load("./000.Final_Scripts/001.CoxModels.Data/ANDIS_Lipids_CoxModel_2.RData")
+
+
+##MATCH##
+tmp <- c(as.character(LiposModel1dcs$variable),as.character(LiposModel1GoDarts$variable),as.character(LiposModel2Andis$variable))
+tmp <- names(table(tmp)[table(tmp) == 3])
+DCS_Lipids_Model_2 <- LiposModel2dcs[match(tmp,LiposModel2dcs$variable),]
+GODARTS_Lipids_Model_2 <- LiposModel2GoDarts[match(tmp,LiposModel2GoDarts$variable),]
+ANDIS_Lipids_Model_2 <- LiposModel2Andis[match(tmp,LiposModel2Andis$variable),]
+
+##PLOT##
+p <- get.plot(DCS_Lipids_Model_2,GODARTS_Lipids_Model_2,"Model 2",cohortLabels=c("DCS","GoDARTS"),
+               xmin = 0.6, xmax = 1.4, ymin=0.6, ymax=1.4,col=lipids.classes.Model_1$Class)
+p2 <- get.plot(DCS_Lipids_Model_2,ANDIS_Lipids_Model_2,"Model 2",cohortLabels=c("DCS","Andis"),
+               xmin = 0.6, xmax = 1.4, ymin=0.6, ymax=1.4,col=lipids.classes.Model_1$Class)
+p3 <- get.plot(GODARTS_Lipids_Model_2,ANDIS_Lipids_Model_2,"Model 2",cohortLabels = c("GoDARTS","Andis"),
+               xmin = 0.6, xmax = 1.4, ymin=0.6, ymax=1.4,col=lipids.classes.Model_1$Class)
+print(p)
+print(p2)
+print(p3)
+
+Combined_Lipids_Model_2_with_ANDIS <- CombineCox(Data01 = DCS_Lipids_Model_2,
+                                       Data02 = GODARTS_Lipids_Model_2,
+                                       Data03 = ANDIS_Lipids_Model_2,
+                                       ColVar = "FDBfullname",
+                                       studyLabels = c("DCS","GoDARTS","Andis"))
+knitr::kable(head(Combined_Lipids_Model_2_with_ANDIS,10))
+
+vars <- Combined_Lipids_Model_1_with_ANDIS[Combined_Lipids_Model_1_with_ANDIS$fdr.random <0.05,"var"]
+save(Combined_Lipids_Model_2_with_ANDIS,file="./000.Final_Scripts/001.CoxModels.Combine/Combined_Lipids_CoxModel_2_with_ANDIS.RData")
+knitr::kable(Combined_Lipids_Model_2_with_ANDIS[match(vars,Combined_Lipids_Model_2_with_ANDIS$var),])
+
+```
+
+```{r,echo=TRUE,eval=TRUE, fig.width=12, fig.height=2.5}
+getForestPlotHR(Data01 =DCS_Lipids_Model_2 ,
+                Data02 =GODARTS_Lipids_Model_2 ,
+                Data03 = ANDIS_Lipids_Model_2 ,
+                Meta = Combined_Lipids_Model_2_with_ANDIS ,
+                variable = "LBTESTCD.TAG.50.1.0")
+getForestPlotHR(Data01 =DCS_Lipids_Model_2 ,
+                Data02 =GODARTS_Lipids_Model_2 ,
+                Data03 = ANDIS_Lipids_Model_2 ,
+                Meta = Combined_Lipids_Model_2_with_ANDIS ,
+                variable = "LBTESTCD.TAG.46.1.0")
+getForestPlotHR(Data01 =DCS_Lipids_Model_2 ,
+                Data02 =GODARTS_Lipids_Model_2 ,
+                Data03 = ANDIS_Lipids_Model_2 ,
+                Meta = Combined_Lipids_Model_2_with_ANDIS ,
+                variable = "LBTESTCD.TAG.48.1.0")
+
+```
+
+
+
+## Model 3
+HbA1c, age, sex, bmi, hdl , cpeptide,diabetes duration,glucose lowering drugs
+```{r CombineModel3}
+load("./000.Final_Scripts/001.CoxModels.Data/DCS_Lipids_CoxModel_3.RData")
+
+load("./000.Final_Scripts/001.CoxModels.Data/GODARTS_Lipids_CoxModel_3.RData")
+
+load("./000.Final_Scripts/001.CoxModels.Data/ANDIS_Lipids_CoxModel_3.RData")
+
+
+##MATCH##
+tmp <- c(as.character(LiposModel1dcs$variable),as.character(LiposModel1GoDarts$variable),as.character(LiposModel3Andis$variable))
+tmp <- names(table(tmp)[table(tmp) == 3])
+DCS_Lipids_Model_3 <- LiposModel3dcs[match(tmp,LiposModel3dcs$variable),]
+GODARTS_Lipids_Model_3 <- LiposModel3GoDarts[match(tmp,LiposModel3GoDarts$variable),]
+ANDIS_Lipids_Model_3 <- LiposModel3Andis[match(tmp,LiposModel3Andis$variable),]
+
+##PLOT##
+p <- get.plot(DCS_Lipids_Model_3,GODARTS_Lipids_Model_3,"Model 3",cohortLabels=c("DCS","GoDARTS"),
+               xmin = 0.6, xmax = 1.4, ymin=0.6, ymax=1.4,col=lipids.classes.Model_1$Class)
+p2 <- get.plot(DCS_Lipids_Model_3,ANDIS_Lipids_Model_3,"Model 3",cohortLabels=c("DCS","Andis"),
+               xmin = 0.6, xmax = 1.4, ymin=0.6, ymax=1.4,col=lipids.classes.Model_1$Class)
+p3 <- get.plot(GODARTS_Lipids_Model_3,ANDIS_Lipids_Model_3,"Model 3",cohortLabels = c("GoDARTS","Andis"),
+               xmin = 0.6, xmax = 1.4, ymin=0.6, ymax=1.4,col=lipids.classes.Model_1$Class)
+print(p)
+print(p2)
+print(p3)
+
+Combined_Lipids_Model_3_with_ANDIS <- CombineCox(Data01 = DCS_Lipids_Model_3,
+                                       Data02 = GODARTS_Lipids_Model_3,
+                                       Data03 = ANDIS_Lipids_Model_3,
+                                       ColVar = "FDBfullname",
+                                       studyLabels = c("DCS","GoDARTS","Andis"))
+knitr::kable(head(Combined_Lipids_Model_3_with_ANDIS,10))
+knitr::kable(Combined_Lipids_Model_3_with_ANDIS[match(vars,Combined_Lipids_Model_3_with_ANDIS$var),])
+save(Combined_Lipids_Model_3_with_ANDIS,file="./000.Final_Scripts/001.CoxModels.Combine/Combined_Lipids_CoxModel_3_with_ANDIS.RData")
+```
+
+```{r,echo=TRUE,eval=TRUE, fig.width=12, fig.height=2.5}
+getForestPlotHR(Data01 =DCS_Lipids_Model_3 ,
+                Data02 =GODARTS_Lipids_Model_3 ,
+                Data03 = ANDIS_Lipids_Model_3 ,
+                Meta = Combined_Lipids_Model_3_with_ANDIS ,
+                variable = "LBTESTCD.TAG.50.1.0")
+getForestPlotHR(Data01 =DCS_Lipids_Model_3 ,
+                Data02 =GODARTS_Lipids_Model_3 ,
+                Data03 = ANDIS_Lipids_Model_3 ,
+                Meta = Combined_Lipids_Model_3_with_ANDIS ,
+                variable = "LBTESTCD.TAG.46.1.0")
+getForestPlotHR(Data01 =DCS_Lipids_Model_3 ,
+                Data02 =GODARTS_Lipids_Model_3 ,
+                Data03 = ANDIS_Lipids_Model_3 ,
+                Meta = Combined_Lipids_Model_3_with_ANDIS ,
+                variable = "LBTESTCD.TAG.48.1.0")
+```
