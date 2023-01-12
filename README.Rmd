@@ -117,23 +117,28 @@ Adjusted
 
 [DCS Lipids](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/DCS_Lipids_CoxModels.md)
 
-[GoDARTS Lipids](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/GoDARTS_Lipids_CoxModels.md)
+[GoDARTS Lipids](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/GODARTS_Lipids_CoxModels.md)
 
 [ANDIS Lipids](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/Andis_Lipids_CoxModels.md)
 
 
 [Combine Lipids](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/Lipids_Combine.html)
 
+
+#### Acyl chains / double bonds
+
+[Acyl chains from Source Data 1](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/Double_bonds_vs_acylchain.R)
+
 ### Proteins
 
 [DCS Proteins](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/DCS_Peptides_CoxModels.md)
 
-[GoDARTS Proteins](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/GoDARTS_Peptides_CoxModels.md)
+[GoDARTS Proteins](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/GODARTS_Peptides_CoxModels.md)
 
 [Combine proteins](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/GoDARTS_Peptides_CoxModels.md)
 
 
-## Interaction models
+### Interaction models
 
 [DCS](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/DCS_Sensitivity_Analyses_BMI_Cpep.md)
 
@@ -141,7 +146,3 @@ Adjusted
 
 [ANDIS](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/ANDIS_Sensitivity_Analyses_BMI_Cpep.md)
 
-
-## Acyl chains
-
-[Acyl chains from Source Data 1](https://github.com/roderickslieker/RHAPSODY/blob/master/002%20Progression/Double_bonds_vs_acylchain.R)
