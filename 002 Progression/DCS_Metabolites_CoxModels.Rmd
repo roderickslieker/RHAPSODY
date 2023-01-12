@@ -1,0 +1,125 @@
+---
+title: "Cox model metabolomics DCS"
+author: "Gerard Bouland / Roderick Slieker"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: md_document
+---
+
+```{r setup, include=FALSE, eval=F}
+knitr::opts_knit$set(root.dir = "D:/001_Projects/001_RHAPSODY/")
+```
+
+## Load libraries and Utils scripts
+```{r prep, message=FALSE, results='hide', eval=F}
+library(datashieldclient)
+library(dsCDISCclient)
+library(survminer)
+library(survival)
+
+source("./000.Final_Scripts/003.Utils/Utils.R")
+source("./000.Final_Scripts/003.Utils/Utils_GB.R")
+source("./000.Final_Scripts/003.Utils/Utils_CoxModels.R")
+```
+
+## Login
+```{r, message=FALSE, results='hide', eval=F}
+#loginpath <- "./logindata_template.txt"
+#Shark Gerard
+loginpath <- "logindata_template.txt"
+cohort <- "dcs"
+datasource <- "opal"
+logIn(datasource, loginpath, cohort)
+```
+
+## Prepare Data
+```{r preparedata, eval=F}
+myAttributes <- c("METABOLOMICS","BMI","AGE","SEX","HDL","HBA1C","CPEPTIDE","TIMETOINSULIN",
+	"TIMEINSULINSTATUS","DIABDUR")
+myTransform <-c(3,0,0,0,0,0,0,0,0,0,0)
+prepareData(assign="ModelData",opal=opal,attributes=myAttributes,transformVector=myTransform, plusOne = TRUE)
+```
+
+## Prepare Formulas
+```{r prepareFormulas, message=FALSE, results='hide', eval=F}
+#MODEL 1 
+MetabolomicsFormula1 <- "survival::Surv(TIMEINSULIN, LBTESTCD.TIMEINSULINSTATUS) ~ %s +
+                             LBTESTCD.HBA1C + age + sex + VSTESTCD.BMI"
+#MODEL 2
+MetabolomicsFormula2 <- "survival::Surv(TIMEINSULIN, LBTESTCD.TIMEINSULINSTATUS) ~ %s +
+                             LBTESTCD.HBA1C + age + sex + VSTESTCD.BMI + LBTESTCD.HDL + LBTESTCD.CPEPTIDE "
+#MODEL 3
+MetabolomicsFormula3 <- ("survival::Surv(TIMEINSULIN, LBTESTCD.TIMEINSULINSTATUS) ~ %s +
+                             LBTESTCD.HBA1C + age + sex + VSTESTCD.BMI + LBTESTCD.HDL + LBTESTCD.CPEPTIDE + DIABETESDURATION + glucoselowering")
+```
+
+## Prepare  function call
+```{r PrepareArguments, message=FALSE, results='hide', eval=F}
+metabolites <- ds.colnames('ModelData')$dcs
+metabolites <- metabolites[which(metabolites == "LBTESTCD.AADA"):which(metabolites=="LBTESTCD.UDCA")]
+```
+
+## Calculate Cox models for model 1
+HbA1c, age, sex, bmi
+```{r metaboliteModel1, message=FALSE, results='hide', eval=F}
+MetabolomicsModel1DCS <- CalculateCoxModel(vars = metabolites,
+                                    formula = MetabolomicsFormula1,
+                                    cohort = "dcs",
+                                    omicType = "METABOLOMICS",
+                                    data = "ModelData")
+
+
+MetabolomicsModel1DCS$fdr <- p.adjust(MetabolomicsModel1DCS$p.val,method="fdr")
+```
+
+```{r, eval=F}
+save(MetabolomicsModel1DCS,file="./000.Final_Scripts/001.CoxModels.Data/DCS_Metabolites_CoxModel_1.RData")
+knitr::kable(head(MetabolomicsModel1DCS[order(MetabolomicsModel1DCS$fdr,decreasing = F),],10))
+```
+
+## Calculate Cox models for model 2
+HbA1c, age, sex, bmi, hdl , cpeptide
+```{r metaboliteModel2,message=FALSE, results='hide', eval=F}
+MetabolomicsModel2DCS <- CalculateCoxModel(vars = metabolites,
+                                    formula = MetabolomicsFormula2,
+                                    cohort = "dcs",
+                                    omicType = "METABOLOMICS",
+                                    data = "ModelData")
+
+
+MetabolomicsModel2DCS$fdr <- p.adjust(MetabolomicsModel2DCS$p.val,method="fdr")
+```
+
+```{r, eval=F}
+save(MetabolomicsModel2DCS,file="./000.Final_Scripts/001.CoxModels.Data/DCS_Metabolites_CoxModel_2.RData")
+knitr::kable(head(MetabolomicsModel2DCS[order(MetabolomicsModel2DCS$fdr,decreasing = F),],10))
+```
+
+## Calculate Cox models for model 3
+HbA1c, age, sex, bmi, hdl , cpeptide,diabetes duration,glucose lowering drugs
+```{r metaboliteModel3, message=FALSE, results='hide', eval=F}
+MetabolomicsModel3DCS <- CalculateCoxModel(vars = metabolites,
+                                    formula = MetabolomicsFormula3,
+                                    cohort = "dcs",
+                                    omicType = "METABOLOMICS",
+                                    data = "ModelData")
+
+
+MetabolomicsModel3DCS$fdr <- p.adjust(MetabolomicsModel3DCS$p.val,method="fdr")
+```
+
+```{r, eval=F}
+save(MetabolomicsModel3DCS,file="./000.Final_Scripts/001.CoxModels.Data/DCS_Metabolites_CoxModel_3.RData")
+knitr::kable(head(MetabolomicsModel3DCS[order(MetabolomicsModel3DCS$fdr,decreasing = F),],10))
+```
+
+## Logout
+```{r logout, message=FALSE, results='hide', eval=F}
+logOut(datasource)
+```
+
+
+
+
+
+
+

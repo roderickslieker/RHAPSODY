@@ -1,0 +1,123 @@
+---
+title: "Cox Model lipids GoDARTS"
+author: "Gerard Bouland / Roderick Slieker"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: md_document
+---
+
+```{r setup, include=FALSE, eval=F}
+knitr::opts_knit$set(root.dir = "D:/001_Projects/001_RHAPSODY/")
+```
+
+## Load libraries and Utils scripts
+```{r prep,results='hide',message=FALSE,warning=FALSE, eval=F}
+library(datashieldclient)
+library(dsCDISCclient)
+library(survminer)
+library(survival)
+
+#Load utils
+source("./000.Final_Scripts/003.Utils/Utils_GB.R")
+source("./000.Final_Scripts/003.Utils/Utils_CoxModels.R")
+```
+
+## Login
+```{r,message=FALSE,warning=FALSE,results='hide', eval=F}
+loginpath <- "logindata_template.txt"
+cohort <- "godarts"
+datasource <- "opal"
+logIn(datasource, loginpath, cohort)
+```
+
+## Prepare Data
+```{r preparedata,results='hide', eval=F}
+#Select required attributes 
+myAttributes <- c("LIPIDOMICS","MEDICATION","BMI","AGE","SEX","HDL","HBA1C","CPEPTIDE","TIMETOINSULIN",
+	"TIMEINSULINSTATUS","DIABDUR")
+myTransform <-c(3,0,0,0,0,0,0,0,0,0,0)
+prepareData(assign="ModelData",opal=opal,attributes=myAttributes,transformVector=myTransform)
+```
+
+
+## Prepare Formulas
+```{r prepareFormulas, eval=F}
+#MODEL 1 
+LipoFormula1 <- "survival::Surv(TIMEINSULIN, LBTESTCD.TIMEINSULINSTATUS) ~ %s +
+                             survival::strata(cut(LBTESTCD.HBA1C ,breaks=c(0,53,75,140))) + age + sex + VSTESTCD.BMI "
+#MODEL 2
+LipoFormula2 <- "survival::Surv(TIMEINSULIN, LBTESTCD.TIMEINSULINSTATUS) ~ %s +
+                             survival::strata(cut(LBTESTCD.HBA1C ,breaks=c(0,53,75,140))) + age + sex + VSTESTCD.BMI + LBTESTCD.HDL + LBTESTCD.CPEPTIDE "
+#MODEL 3
+LipoFormula3 <- ("survival::Surv(TIMEINSULIN, LBTESTCD.TIMEINSULINSTATUS) ~ %s +
+                             survival::strata(cut(LBTESTCD.HBA1C ,breaks=c(0,53,75,140))) + age + sex + VSTESTCD.BMI + LBTESTCD.HDL + LBTESTCD.CPEPTIDE + DIABETESDURATION + glucoselowering")
+
+```
+
+## Prepare arguments for function call
+```{r PrepareArguments, eval=F}
+targets <- read.table("./Data/SwissLipids.csv", header=T, sep=",")
+lipids <- ds.colnames('ModelData')$godarts
+lipids <- lipids[which(lipids == "LBTESTCD.CE.14.0.0"):which(lipids=="LBTESTCD.TAG.58.8.0")]
+```
+
+## Calculate Cox models for model 1
+HbA1c, Age, Sex, BMI
+```{r LiposModel1,results='hide', eval=F}
+LiposModel1GoDarts <- CalculateCoxModel(vars = lipids,
+                                    formula = LipoFormula1,
+                                    targets = targets,cohort = "godarts",
+                                    omicType = "LIPIDOMICS",
+                                    data = "ModelData")
+LiposModel1GoDarts$fdr <- p.adjust(LiposModel1GoDarts$p.val,method="fdr")
+```
+
+
+```{r LiposModel1Out, eval=F}
+save(LiposModel1GoDarts,file="lipotypegodartsCoxModel1.RData")
+knitr::kable(head(LiposModel1GoDarts[order(LiposModel1GoDarts$fdr,decreasing = F),],10))
+```
+
+## Calculate Cox models for model 2
+HbA1c, Age, Sex, BMI, HDL , CPeptide
+```{r LiposModel2,results='hide', eval=F}
+LiposModel2GoDarts <- CalculateCoxModel(vars = lipids,
+                                    formula = LipoFormula2,
+                                    targets = targets,cohort = "godarts",
+                                    omicType = "LIPIDOMICS",
+                                    data = "ModelData")
+LiposModel2GoDarts$fdr <- p.adjust(LiposModel2GoDarts$p.val,method="fdr")
+```
+
+
+```{r LiposModel2Out, eval=F}
+save(LiposModel2GoDarts,file="lipotypegodartsCoxModel2.RData")
+knitr::kable(head(LiposModel2GoDarts[order(LiposModel2GoDarts$fdr,decreasing = F),],10))
+```
+
+## Calculate Cox models for model 3
+HbA1c, Age, Sex, BMI, HDL , CPeptide, Diabetes Duration, Glucose Lowering Drugs
+```{r LiposModel3,results='hide', eval=F}
+LiposModel3GoDarts <- CalculateCoxModel(vars = lipids,
+                                    formula = LipoFormula3,
+                                    targets = targets,cohort = "godarts",
+                                    omicType = "LIPIDOMICS",
+                                    data = "ModelData")
+LiposModel3GoDarts$fdr <- p.adjust(LiposModel3GoDarts$p.val,method="fdr")
+```
+
+
+```{r LiposModel3Out, eval=F}
+save(LiposModel3GoDarts,file="lipotypegodartsCoxModel3.RData")
+knitr::kable(head(LiposModel3GoDarts[order(LiposModel3GoDarts$fdr,decreasing = F),],10))
+```
+
+## Logout
+```{r logout, eval=F}
+logOut(datasource)
+```
+
+
+
+
+
+
