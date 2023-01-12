@@ -2,7 +2,7 @@
 title: "Cox model metabolomics godarts"
 author: "Roderick Slieker"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
-output: html_document
+output: md_document
 ---
 
 ```{r setup, include=FALSE, eval=F}
